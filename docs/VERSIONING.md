@@ -5,4 +5,3 @@
 - 在 releases 下按版本留 APK、SHA-256 和源码 bundle。版本索引写在 RELEASES.md。私钥和恢复口令单独保管。
 - 回看旧源码可运行 `git switch -c restore/v0.1.0 v0.1.0`。回退主分支中的独立改动使用 `git revert <提交>`，保留历史。
 - 从归档恢复先用 `git bundle verify <路径>` 校验，再用 `git clone <bundle路径> <独立目录>`。保护较新数据，旧 APK 不应在较新数据库上直接降级安装。
-
