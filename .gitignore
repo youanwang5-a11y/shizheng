@@ -21,6 +21,7 @@ signing.properties
 /releases/
 /private/
 /personal-materials/
+/imports/
 *.shizheng
 *.shizheng.zip
 
