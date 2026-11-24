@@ -3,5 +3,6 @@
 - main 记录可追溯历史。分别提交设计基线、验证后的功能及交付文档，使用简明且指向实际改动的消息。
 - 可用 v0.0.0 表示初始化。v0.1.0 仅用于达到首版验收的构建，使用带说明的标签。
 - 在 releases 下按版本留 APK、SHA-256 和源码 bundle。版本索引写在 RELEASES.md。私钥和恢复口令单独保管。
+- GitHub 私有仓库为 [youanwang5-a11y/shizheng](https://github.com/youanwang5-a11y/shizheng)。本地 `main` 跟踪 `origin/main`，版本标签按需推送。版本归档存放在本机 `releases/`。
 - 回看旧源码可运行 `git switch -c restore/v0.1.0 v0.1.0`。回退主分支中的独立改动使用 `git revert <提交>`，保留历史。
 - 从归档恢复先用 `git bundle verify <路径>` 校验，再用 `git clone <bundle路径> <独立目录>`。保护较新数据，旧 APK 不应在较新数据库上直接降级安装。
