@@ -1,0 +1,48 @@
+Generated with built-in image_gen. Five UI concept boards, 2026-11-24.
+
+## Board 1
+
+Use case: ui-mockup
+Create board 1 of 4 for a Chinese Android app for university students recording activities and evidence documents. High fidelity practical implementable UI specification, NOT marketing. Landscape very high resolution canvas, four equally sized tall complete Android screens side by side, each entire screen readable, ample gutters, minimal device frame. Chinese heading above board "01 记录与查找". Each phone has a small number and caption ABOVE it. Consistent design: warm white #F7F8FA, white surfaces, deep teal #168B80 primary, dark charcoal text, orange pending labels, small rounded corners, thin outline icons, generous spacing, precise simplified Chinese. App working title "拾证". Bottom navigation ONLY "记录" and "我的", never AI. Floating teal + button on list. No charts, no account, no scoring system. Show real useful content.
+Screen 01 caption "记录列表": status 9:41, title 拾证 small subtitle 每一份经历，都有迹可循, semester dropdown 2026—2027学年 第一学期, search input 搜索名称、单位、备注, chips 全部 / 待补证明 3 / 已归档, small filter icon 筛选. Compact list examples 校园程序设计竞赛 with 竞赛·校级, 2026.11.18, green 已归档 and thumbnail; 图书馆志愿服务 with 志愿服务·校级, 2026.11.12 orange 待补证明; 大学生创新训练项目 科研·省级 已归档; 校园摄影比赛 文体活动·校级 已归档. bottom nav record selected.
+Screen 02 caption "搜索结果": back arrow search bar containing 志愿, cancel 取消, result text 找到 2 条记录; 图书馆志愿服务 待补证明 and 社区环保志愿活动 已归档. subtle matched word emphasis. no keyboard needed.
+Screen 03 caption "筛选面板": dimmed list behind a white bottom sheet occupying 80% screen. header 筛选 and 重置; 类别 chips 全部 竞赛 志愿服务 社会实践 科研 文体活动 荣誉表彰 培训 其他; 级别 chips 全部 国家级 省级 市级 校级 院级 其他; 学期 dropdown; 归档状态 chips 全部 已归档 待补证明; fixed bottom teal 查看结果 button.
+Screen 04 caption "首次使用": empty list screen same title, search area, simple small outline folder art in center, "还没有记录" and "先记下一次经历，证明可以以后补", button 新建第一条记录; bottom same two tabs.
+Keep labels accurate, no English placeholder gibberish. No outside explanatory essays, no decorative photo backgrounds.
+
+## Board 2
+
+Use case: ui-mockup. Create board 2 of 4, Chinese Android app "拾证", activity evidence archive. High fidelity implementable UI, landscape 4 equal full tall Android screens in single row, no perspective, ample gutters. Heading "02 新增与附件", screen numbers 5 through 8 above phones. SAME design as board 1: warm white #F7F8FA, teal #168B80, charcoal, white cards, orange pending label, restrained rounded corners, outline icons, clear precise simplified Chinese, generous mobile spacing. Screens are stack pages with back arrow, no bottom tab navigation.
+05 "新建记录 · 基本信息": top 新建记录 right 保存. All fields vertical with appropriate realistic control sizes: 名称 * placeholder 例如：校园程序设计竞赛; 类别 * chips eight options 竞赛 志愿服务 社会实践 科研 文体活动 荣誉表彰 培训 其他, selected 竞赛; 级别 optional selector 校级; 时间 * single day/date-range segmented 单日 / 时间段 date 2026年11月18日; 学期 2026—2027 第一学期 with small 自动归入，可修改; fixed teal 下一步：补充信息.
+06 "新建记录 · 补充信息": top back 补充信息 保存; fields 颁发／组织单位 input 校团委; 结果 input 一等奖; 备注 multiline 团队参赛，负责算法设计; section 证明材料（选填）, 2 attachments 证书.jpg image thumb and 获奖名单.pdf red file icon each remove icon; outlined 添加证明; helper 支持照片、PDF、Word，可添加多个; fixed teal 保存记录; small secondary 暂无证明也可以保存.
+07 "添加证明": screen 06 behind dim overlay, bottom action sheet titled 添加证明, options camera icon 拍照, image icon 从相册选择, folder icon 选择文件 with subtitle PDF、Word、图片, bottom 取消. It is a system-style source picker, not a fake album grid.
+08 "未保存的修改": completed form behind dim overlay, centered confirmation dialog title 放弃本次修改？ body 尚未保存的内容将丢失, action 继续编辑 teal and 放弃修改 neutral text; show small subdued orange 待补证明 on underlying form. This is discard editing, not deleting records.
+No AI controls in this entire board, optional AI disabled. No decorative stock pictures in pending entries, actual evidence thumbnails only. Exact functional Chinese, no invented extra navigation.
+
+## Board 3
+
+Use case: ui-mockup. Board 3 of Chinese Android app 拾证. Heading "03 详情与证明查看". Wide landscape high resolution, FIVE complete equal portrait Android screens aligned one row, generous gutters, flat minimal thin device frames, not perspective. Teal #168B80, white #F7F8FA backgrounds, white cards, charcoal text, orange pending state; legible simplified Chinese.
+09 caption "记录详情": top back 记录详情 编辑 and overflow ⋮; title 校园程序设计竞赛 green 已归档; category 竞赛, 级别 校级, 时间 2026.11.18, 学期 2026—2027 第一学期, 单位 校团委, 结果 一等奖, 备注 团队参赛，负责算法设计; section 证明材料 3, show 证书.jpg small actual certificate preview, 获奖名单.pdf red PDF icon, 活动证明.docx blue W icon; 添加证明 button. Tiny overflow menu shown below top ⋮ with 重命名附件? NO overflow RECORD options only 编辑记录 and 删除记录 in red. Do not include AI (disabled).
+10 caption "待补证明": detail 图书馆志愿服务, orange 待补证明, 志愿服务 校级, 时间 2026.11.12, 单位 校图书馆, 结果 服务8小时; section 证明材料 empty icon, 尚未添加证明, 可以先记录经历，拿到证明后再补充; teal 添加证明; no photos or stock imagery.
+11 caption "照片查看": charcoal/black image viewer, top white back 1 / 2 and overflow; centered realistic white/red award certificate with subtle text 校园程序设计竞赛 一等奖, bottom thumbnail strip and small hint 双指缩放查看; menu in corner 重命名 删除附件. Deletion of attachment distinct from deletion of record.
+12 caption "PDF 预览": top back 获奖名单.pdf overflow, white PDF sheet under gray viewer background with list title 获奖名单, simple table, page indicator 1 / 3 and zoom button, practical readable reader.
+13 caption "Word 附件": top back 活动证明.docx; centered blue Word file icon, filename 活动证明.docx, size 28 KB, text 使用手机上的兼容应用查看; teal 用其他应用打开. No fake Word in-app document editing, no account, no AI bottom tab.
+Screen numbers 09 10 11 12 13 above phone. No bottom tabs in detail/viewer screens. Consistent scale and spacing.
+
+## Board 4
+
+Use case: ui-mockup. Board 4 of 5 Chinese Android app "拾证", evidence records manager. Heading "04 我的与数据管理". Landscape high res board, FOUR equal full portrait Android screens side by side, complete visible UI, minimal thin device frames, no perspective. Warm white #F7F8FA, white cards, primary teal #168B80, dark charcoal, gentle borders, clean simplified Chinese. Same visual family as prior boards. No accounts, avatars, cloud login, scoring, ads.
+14 caption "我的": header 我的; small local folder icon and subtitle 数据保存在这台设备; simple summary 12 条记录 9 已归档 3 待补证明; menu rows 学期管理, 备份与恢复, AI 设置 right status 未启用, 关于应用 right v0.1; small note 无需登录，离线可用. Bottom navigation ONLY 记录 and 我的 selected. DO NOT display disabled export button. Export merely reserved in architecture no visible dead-end.
+15 caption "学期管理": back 学期管理 right 添加; list 2026—2027学年 第一学期 with dates 2026.09.01—2027.01.31 and 当前学期 badge, next 第二学期 dates 2027.02.01—2027.08.31, older 2025—2026学年 第二学期. Bottom sheet on same screen 编辑学期 with fields 学期名称 2026—2027学年 第一学期, 开始日期 2026.09.01, 结束日期 2027.01.31, 设置为当前学期 switch ON, 保存. Small hint 日期用于自动归入学期.
+16 caption "备份与恢复": back 备份与恢复; section 完整备份, text 包含全部记录与证明附件，不包含 API Key; last backup 尚未备份; teal 创建备份 button; section 从备份恢复 with outlined 选择备份文件; note 建议定期备份到你选择的位置; small green inline success card 备份已保存 12条记录 · 18个附件. No false cloud sync.
+17 caption "恢复前确认": same backup background dimmed; centered dialog title 恢复备份; filename 拾证备份_20261124.zip; info 12 条记录 · 18 个附件; warning 本次恢复将替换当前记录和附件; checkbox with check 已保存当前数据的备份; actions 取消 secondary and 确认恢复 teal. Keep legitimate destructive recovery clear. This screen illustrates confirmation only, no actual operation.
+No AI assistant tab, no chat in these screens.
+
+## Board 5
+
+Use case: ui-mockup. Board 5 of Chinese Android app "拾证", heading "05 可选 AI · 按需启用". Landscape high resolution board, FIVE equal full tall Android screens side by side, each completely visible, generous gutters, small numbered captions above. Consistent practical Android UI: teal #168B80, warm white #F7F8FA, white cards, charcoal legible simplified Chinese, outline icons, restrained corner radii. No standalone AI bottom tab anywhere, no chatbot home.
+18 caption "AI 设置": stack page back AI 设置; row 启用 AI toggle ON; fields 接口地址 placeholder https://api.example.com/v1, API Key masked •••••••• with eye, 模型名称 placeholder 输入模型名称; outlined 测试连接 button and compact green 连接成功 status (a success state); small helper 关闭后，记录页面不显示 AI 入口; bottom 保存配置; footer Key 仅保存在本机，不随备份导出. Optional setting is a switch.
+19 caption "从文字生成": stack back 从文字生成; explanatory 粘贴活动信息，生成记录草稿; multiline actual content 11月18日参加了校团委组织的校园程序设计竞赛，获得校级一等奖。; tiny line 请核对个人信息后再发送; teal 生成草稿. small text supporting more input optional 添加证明（需模型支持）; no model capability guarantees.
+20 caption "发送前确认": dim same page behind centered modal 使用 AI 整理？; labels 接收服务 api.example.com, 发送内容 本次输入的活动描述; note 内容将发送到你配置的 AI 服务; two actions 取消 / 确认发送. No default selected blanket future consent checkbox, only current operation.
+21 caption "检查并保存": back 确认草稿; label AI 生成，请核对; editable form 名称 校园程序设计竞赛; 类别 竞赛; 级别 校级; 时间 2026.11.18; 颁发／组织单位 校团委; 结果 一等奖; orange 待补证明; helper 尚未附加证明，可稍后补充; teal 确认并保存; secondary 重新生成. NO auto save without user confirmation.
+22 caption "连接失败": back AI 设置; same address and masked key and model fields; inline red banner 连接失败，请检查接口地址、Key 和网络; button 重新测试; secondary 稍后再试; helper 已有记录可继续正常使用. No HTTP internals, no raw secret keys. Same mobile design family, no decorative scene.
