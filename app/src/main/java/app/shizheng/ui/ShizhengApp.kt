@@ -7,9 +7,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
@@ -28,7 +28,11 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -39,6 +43,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import app.shizheng.data.Evidence
@@ -299,18 +304,36 @@ private fun RootNavigation(state: AppState, showCapsule: Boolean) {
         }
         if (onRecords) AnimatedVisibility(
             visible = showCapsule,
-            enter = fadeIn() + expandVertically(expandFrom = Alignment.Bottom, clip = false),
-            exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Bottom, clip = false)
-        ) { NavigationCapsule(state, onRecords) }
+            enter = expandVertically(expandFrom = Alignment.Bottom, clip = false),
+            exit = shrinkVertically(shrinkTowards = Alignment.Bottom, clip = false)
+        ) {
+            val opacity by transition.animateFloat(label = "capsule opacity") { phase ->
+                if (phase == EnterExitState.Visible) 1f else 0f
+            }
+            NavigationCapsule(state, onRecords, Modifier.graphicsLayer {
+                alpha = opacity
+                // Apply opacity without an offscreen buffer that clips the shadow to the layer bounds.
+                compositingStrategy = CompositingStrategy.ModulateAlpha
+            })
+        }
         else NavigationCapsule(state, onRecords)
     }
 }
 
 @Composable
-private fun NavigationCapsule(state: AppState, onRecords: Boolean) {
+private fun NavigationCapsule(state: AppState, onRecords: Boolean, modifier: Modifier = Modifier) {
+    val capsule = modifier.widthIn(max = 336.dp).fillMaxWidth(0.78f)
+    val withShadow = if (onRecords) capsule.dropShadow(
+        shape = CircleShape,
+        shadow = Shadow(
+            radius = 10.dp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f),
+            offset = DpOffset(0.dp, 5.dp)
+        )
+    ) else capsule
     Surface(
-        Modifier.widthIn(max = 336.dp).fillMaxWidth(0.78f),
-        shape = CircleShape, shadowElevation = 9.dp,
+        withShadow,
+        shape = CircleShape, shadowElevation = if (onRecords) 0.dp else 9.dp,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(Modifier.selectableGroup().heightIn(min = 60.dp)) {
