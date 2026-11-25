@@ -372,7 +372,7 @@ private fun RecordForm(state: AppState, data: Snapshot, draft: RecordDraft) {
             ) { category -> state.updateDraft { it.copy(category = category) } }
             HorizontalDivider(color = divider)
             Choice(
-                "级别（选填）", draft.level?.label ?: "请选择级别",
+                "级别 (选填)", draft.level?.label ?: "请选择级别",
                 listOf(null to "未选择") + Level.entries.map { it to it.label }, compact = true
             ) { level -> state.updateDraft { it.copy(level = level) } }
             HorizontalDivider(color = divider)
@@ -394,7 +394,7 @@ private fun DateEntry(draft: RecordDraft, update: ((RecordDraft) -> RecordDraft)
         !draft.ranged || draft.end.isEmpty() -> draft.start
         else -> "${draft.start} 至 ${draft.end}"
     }
-    FormRow("时间（选填）", Modifier.clickable(role = Role.Button) { show = true }) { FormValue(current) }
+    FormRow("时间 (选填)", Modifier.clickable(role = Role.Button) { show = true }) { FormValue(current) }
     if (show) AlertDialog(
         onDismissRequest = { show = false },
         title = { Text("选择时间") },
