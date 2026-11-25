@@ -109,7 +109,12 @@ class StorageDeviceTest {
         assertArrayEquals(original.getValue("说明.docx"), restarted.evidence.file(restoredFiles[0]).readBytes())
         assertArrayEquals(original.getValue("照片.png"), restarted.evidence.file(restoredFiles[1]).readBytes())
         assertArrayEquals(original.getValue("材料.pdf"), restarted.evidence.file(restoredFiles[2]).readBytes())
-        restarted.deleteRecord(draft.id)
+        val second = RecordDraft(title = "同批删除", category = Category.OTHER.name)
+        restarted.save(second)
+        val preDelete = restarted.data.value
+        assertTrue(runCatching { restarted.deleteRecords(setOf(draft.id, newId())) }.exceptionOrNull() is UserError)
+        assertEquals(preDelete, restarted.data.value)
+        assertEquals(2, restarted.deleteRecords(setOf(draft.id, second.id)))
         assertFalse(restarted.data.value.records.any { it.id == draft.id })
         assertTrue(restoredFiles.none { restarted.evidence.file(it).exists() })
         assertArrayEquals(original.getValue("说明.docx"), exported.last().readBytes())

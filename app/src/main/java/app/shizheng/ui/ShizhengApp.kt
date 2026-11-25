@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import app.shizheng.data.Evidence
 import app.shizheng.data.EvidenceKind
+import app.shizheng.data.Record
 import app.shizheng.data.Snapshot
 import java.time.LocalDate
 
@@ -34,6 +35,10 @@ internal fun ShizhengApp(state: AppState) {
     val snackbar = remember { SnackbarHostState() }
     val screen = state.screen
     val atRoot = screen == Screen.RECORDS || screen == Screen.MINE
+    val selection = state.selectedRecordIds.takeIf { screen == Screen.RECORDS }
+    val results = if (screen == Screen.RECORDS) remember(data, state.filter) { state.filter.apply(data) } else emptyList()
+    val visibleIds = remember(results) { results.mapTo(hashSetOf(), Record::id) }
+    var deleteSelection by remember { mutableStateOf<Set<String>?>(null) }
     var leaveEditor by remember { mutableStateOf(false) }
     var leaveSettings by remember { mutableStateOf(false) }
     val message = state.message
@@ -56,11 +61,12 @@ internal fun ShizhengApp(state: AppState) {
                 Screen.CATEGORIES -> state.screen = state.categoriesReturn
                 Screen.AI_SETTINGS -> if (state.aiSettingsDirty) leaveSettings = true else state.screen = state.settingsReturn
                 Screen.TERMS, Screen.EXPORT, Screen.BACKUP, Screen.ABOUT -> state.screen = Screen.MINE
+                Screen.RECORDS -> state.stopSelectingRecords()
                 else -> Unit
             }
         }
     }
-    BackHandler(enabled = !atRoot || state.busy, onBack = back)
+    BackHandler(enabled = !atRoot || state.busy || selection != null, onBack = back)
 
     val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
         state.captureFile?.let { file ->
@@ -123,20 +129,39 @@ internal fun ShizhengApp(state: AppState) {
             TopAppBar(
                 title = {
                     Text(
-                        if (screen == Screen.EDITOR) when {
-                            state.editingExisting -> "编辑记录"
-                            else -> "新建记录"
-                        } else screen.title, fontWeight = FontWeight.SemiBold
+                        when {
+                            selection != null -> "已选 ${selection.size} 条"
+                            screen == Screen.EDITOR -> if (state.editingExisting) "编辑记录" else "新建记录"
+                            else -> screen.title
+                        }, fontWeight = FontWeight.SemiBold
                     )
                 },
                 navigationIcon = {
-                    if (!atRoot) IconButton(onClick = back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
+                    if (!atRoot || selection != null) IconButton(onClick = back) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, if (selection == null) "返回" else "退出多选")
+                    }
+                },
+                actions = {
+                    if (screen == Screen.RECORDS && state.ready && selection == null) {
+                        TextButton(state::startSelectingRecords, enabled = results.isNotEmpty()) { Text("多选") }
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         },
         bottomBar = {
-            if (atRoot) NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+            if (selection != null) BottomAppBar {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    TextButton({ state.toggleAllRecords(visibleIds) }, enabled = visibleIds.isNotEmpty()) {
+                        Text(if (visibleIds.isNotEmpty() && selection == visibleIds) "取消全选" else "全选")
+                    }
+                    TextButton({ exportRecords(selection) }, enabled = selection.isNotEmpty()) { Text("导出") }
+                    TextButton(
+                        { deleteSelection = selection }, enabled = selection.isNotEmpty(),
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) { Text("删除") }
+                }
+            } else if (atRoot) NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                 NavigationBarItem(
                     screen == Screen.RECORDS, { state.screen = Screen.RECORDS },
                     icon = { Icon(Icons.AutoMirrored.Filled.List, null) }, label = { Text("记录") }
@@ -148,7 +173,7 @@ internal fun ShizhengApp(state: AppState) {
             }
         },
         floatingActionButton = {
-            if (screen == Screen.RECORDS && state.ready) ExtendedFloatingActionButton(
+            if (screen == Screen.RECORDS && state.ready && selection == null) ExtendedFloatingActionButton(
                 text = { Text("新增") }, icon = { Icon(Icons.Default.Add, null) }, onClick = { state.editRecord() },
                 modifier = Modifier.semantics { contentDescription = "新增记录" },
                 containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary
@@ -163,7 +188,7 @@ internal fun ShizhengApp(state: AppState) {
                     Button(state::load) { Text("重试") }
                 }
             } else when (screen) {
-                Screen.RECORDS -> RecordList(state, data)
+                Screen.RECORDS -> RecordList(state, data, results)
                 Screen.MINE -> Mine(state, data)
                 Screen.DETAIL -> data.records.firstOrNull { it.id == state.recordId }?.let { RecordDetail(state, data, it) }
                 Screen.EDITOR, Screen.EXTRAS -> state.draft?.let {
@@ -192,6 +217,13 @@ internal fun ShizhengApp(state: AppState) {
         "放弃 AI 设置修改？", "本次配置尚未保存。", "放弃修改", { leaveSettings = false },
         { leaveSettings = false; state.screen = state.settingsReturn }, "继续编辑"
     )
+    deleteSelection?.let { ids ->
+        val attachmentCount = data.evidence.count { it.recordId in ids }
+        Confirm(
+            "删除选中的 ${ids.size} 条记录？", "将删除这些记录和拾证内的 $attachmentCount 份附件。外部源文件会保留。",
+            "确认删除", { deleteSelection = null }, { deleteSelection = null; state.deleteSelectedRecords(ids) }
+        )
+    }
     if (state.ready && state.showWelcome) WelcomeDialog(data, state.busy, state::completeWelcome)
     if (state.busy) Dialog(onDismissRequest = {}) {
         Surface(shape = MaterialTheme.shapes.large) {

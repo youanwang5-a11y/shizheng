@@ -1,9 +1,11 @@
 package app.shizheng.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
@@ -11,38 +13,39 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.shizheng.data.*
 
 @Composable
-internal fun RecordList(state: AppState, data: Snapshot) {
+internal fun RecordList(state: AppState, data: Snapshot, results: List<Record>) {
     var showFilters by remember { mutableStateOf(false) }
     val filter = state.filter
-    val results = remember(data, filter) { filter.apply(data) }
+    val selection = state.selectedRecordIds
     val filesByRecord = remember(data) { data.evidence.groupBy(Evidence::recordId) }
 
     LazyColumn(
         Modifier.fillMaxWidth().padding(horizontal = 18.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
-        contentPadding = PaddingValues(top = 8.dp, bottom = 102.dp)
+        contentPadding = PaddingValues(top = 8.dp, bottom = if (selection == null) 102.dp else 12.dp)
     ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
-                    filter.query, { state.filter = filter.copy(query = it.take(200)) },
+                    filter.query, { state.changeFilter(filter.copy(query = it.take(200))) },
                     Modifier.fillMaxWidth(), singleLine = true, shape = MaterialTheme.shapes.large,
                     placeholder = { Text("搜索名称、单位或备注") },
                     leadingIcon = { Icon(Icons.Default.Search, "搜索记录") },
                     trailingIcon = {
-                        if (filter.query.isNotEmpty()) TextButton({ state.filter = filter.copy(query = "") }) { Text("清空") }
+                        if (filter.query.isNotEmpty()) TextButton({ state.changeFilter(filter.copy(query = "")) }) { Text("清空") }
                     }
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         for (status in ArchiveState.entries) {
-                            FilterChip(filter.state == status, { state.filter = filter.copy(state = status) }, { Text(status.label) })
+                            FilterChip(filter.state == status, { state.changeFilter(filter.copy(state = status)) }, { Text(status.label) })
                         }
                     }
                     TextButton({ showFilters = true }) { Text("筛选") }
@@ -61,20 +64,24 @@ internal fun RecordList(state: AppState, data: Snapshot) {
                     } else {
                         Heading("没有符合条件的记录")
                         Help("试试其他关键词，或清除筛选。")
-                        TextButton({ state.filter = RecordFilter() }) { Text("清除搜索和筛选") }
+                        TextButton({ state.changeFilter(RecordFilter()) }) { Text("清除搜索和筛选") }
                     }
                 }
             }
         }
         items(results, key = Record::id) { record ->
             val files = filesByRecord[record.id].orEmpty()
+            val selected = selection?.contains(record.id) == true
+            val action = if (selection == null) Modifier.clickable { state.openRecord(record.id) }
+            else Modifier.toggleable(selected, role = Role.Checkbox, onValueChange = { state.toggleRecordSelection(record.id) })
             Surface(
-                onClick = { state.openRecord(record.id) },
                 modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large,
+                color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
-                Row(Modifier.padding(13.dp), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    EvidenceThumbnail(state.repository.evidence, files.minByOrNull(Evidence::order), record.category)
+                Row(Modifier.then(action).padding(13.dp), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (selection != null) Checkbox(selected, onCheckedChange = null, modifier = Modifier.align(Alignment.CenterVertically))
+                    else EvidenceThumbnail(state.repository.evidence, files.minByOrNull(Evidence::order), record.category)
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text(record.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
                             maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -90,7 +97,7 @@ internal fun RecordList(state: AppState, data: Snapshot) {
         }
     }
     if (showFilters) FilterDialog(filter, data, { showFilters = false }) {
-        state.filter = it
+        state.changeFilter(it)
         showFilters = false
     }
 }

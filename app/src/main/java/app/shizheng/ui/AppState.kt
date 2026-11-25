@@ -74,6 +74,9 @@ internal class AppState @JvmOverloads constructor(
     var detailReturn by mutableStateOf(Screen.RECORDS)
         private set
     var filter by mutableStateOf(RecordFilter())
+        private set
+    var selectedRecordIds by mutableStateOf<Set<String>?>(null)
+        private set
     var draft by mutableStateOf<RecordDraft?>(null)
     private var original: RecordDraft? = null
     private var editorReturn = Screen.RECORDS
@@ -126,6 +129,25 @@ internal class AppState @JvmOverloads constructor(
         check(welcomePreferences.edit().putBoolean("completed", completed).commit())
     }
 
+    fun changeFilter(next: RecordFilter) {
+        if (filter == next) return
+        filter = next
+        if (selectedRecordIds != null) selectedRecordIds = emptySet()
+    }
+
+    fun startSelectingRecords() { selectedRecordIds = emptySet() }
+
+    fun stopSelectingRecords() { selectedRecordIds = null }
+
+    fun toggleRecordSelection(id: String) {
+        val selected = selectedRecordIds ?: return
+        selectedRecordIds = if (id in selected) selected - id else selected + id
+    }
+
+    fun toggleAllRecords(visible: Set<String>) {
+        selectedRecordIds = if (selectedRecordIds == visible) emptySet() else visible
+    }
+
     fun openRecord(id: String, returnTo: Screen = Screen.RECORDS) {
         recordId = id
         detailReturn = returnTo
@@ -172,6 +194,12 @@ internal class AppState @JvmOverloads constructor(
         recordId = null
         screen = detailReturn
         message = "记录已删除"
+    }
+
+    fun deleteSelectedRecords(ids: Set<String>) = operation("删除失败，请重试。") {
+        val count = repository.deleteRecords(ids)
+        stopSelectingRecords()
+        message = "已删除 $count 条记录"
     }
 
     fun importFiles(uris: List<Uri>, camera: Boolean = false) {
@@ -318,7 +346,7 @@ internal class AppState @JvmOverloads constructor(
 
     fun deleteCategory(id: String) = operation("无法删除类别。") {
         repository.deleteCategory(id)
-        if (filter.category == id) filter = filter.copy(category = null)
+        if (filter.category == id) changeFilter(filter.copy(category = null))
         if (original?.category != id) updateDraft { if (it.category == id) it.copy(category = null) else it }
         message = "类别已删除"
     }
@@ -368,7 +396,7 @@ internal class AppState @JvmOverloads constructor(
         val incoming = prepared ?: return@operation
         prepared = null
         repository.replace(incoming)
-        filter = RecordFilter()
+        changeFilter(RecordFilter())
         message = "已恢复记录及附件"
     }
 

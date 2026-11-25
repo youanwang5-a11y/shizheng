@@ -42,8 +42,8 @@ interface RecordsDao {
     @Query("DELETE FROM evidence WHERE recordId = :recordId")
     suspend fun clearEvidence(recordId: String)
 
-    @Query("DELETE FROM records WHERE id = :id")
-    suspend fun deleteRecord(id: String)
+    @Query("DELETE FROM records WHERE id IN (:ids)")
+    suspend fun deleteRecords(ids: List<String>)
 
     @Query("DELETE FROM records")
     suspend fun clearRecords()

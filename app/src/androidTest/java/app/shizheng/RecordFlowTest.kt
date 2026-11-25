@@ -10,6 +10,7 @@ import app.shizheng.ai.AiConfig
 import app.shizheng.ai.AiConfigStore
 import app.shizheng.data.Category
 import app.shizheng.data.RecordDraft
+import app.shizheng.data.RecordFilter
 import app.shizheng.data.Snapshot
 import app.shizheng.data.defaultTerms
 import app.shizheng.ui.RecordExportScreen
@@ -91,6 +92,44 @@ class RecordFlowTest {
         click("大二上")
         click("导出 2 条记录")
         assertEquals(setOf(records[0].id, records[2].id), exported)
+    }
+
+    @Test fun multiSelectLimitsSelectAllAndDeletionToVisibleRecords() {
+        val state = render()
+        val drafts = listOf("批量验证甲", "批量验证乙", "保留验证丙").map {
+            RecordDraft(title = it, category = Category.OTHER.name)
+        }
+        try {
+            kotlinx.coroutines.runBlocking { drafts.forEach { state.repository.save(it) } }
+            ui.runOnIdle { state.changeFilter(RecordFilter(query = "批量验证")) }
+            click("多选")
+            ui.onNodeWithText("导出").assertIsNotEnabled()
+            click("批量验证甲")
+            waitFor("已选 1 条")
+            click("全选")
+            waitFor("已选 2 条")
+            ui.onNodeWithText("保留验证丙").assertDoesNotExist()
+            ui.onNodeWithText("导出").assertIsEnabled()
+            click("取消全选")
+            waitFor("已选 0 条")
+            click("全选")
+            ui.runOnIdle { state.changeFilter(RecordFilter(query = "批量验证甲")) }
+            waitFor("已选 0 条")
+            ui.runOnIdle { state.changeFilter(RecordFilter(query = "批量验证")) }
+            click("全选")
+            click("删除")
+            waitFor("删除选中的 2 条记录？")
+            click("取消")
+            assertTrue(drafts.all { draft -> state.data.value.records.any { it.id == draft.id } })
+            click("删除")
+            click("确认删除")
+            waitFor("已删除 2 条记录")
+            ui.onNodeWithText("多选").assertExists()
+            assertEquals(listOf(drafts.last().id), state.data.value.records.map { it.id }.filter { id -> drafts.any { it.id == id } })
+        } finally {
+            val remaining = state.data.value.records.map { it.id }.filter { id -> drafts.any { it.id == id } }.toSet()
+            kotlinx.coroutines.runBlocking { state.repository.deleteRecords(remaining) }
+        }
     }
 
     @Test fun storesUnprovenRecordAndKeepsAiEntryInNewRecord() {

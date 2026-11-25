@@ -66,11 +66,23 @@ class RecordRepository(context: Context) {
         draft.files.filterNot { it.id in ids }.forEach(evidence::remove)
     }
 
-    suspend fun deleteRecord(id: String) = locked {
-        val previous = data.value.filesFor(id)
-        dao.deleteRecord(id)
+    suspend fun deleteRecord(id: String) {
+        deleteRecords(setOf(id))
+    }
+
+    suspend fun deleteRecords(ids: Set<String>): Int = locked {
+        if (ids.isEmpty()) return@locked 0
+        val current = data.value
+        if (current.records.count { it.id in ids } != ids.size) {
+            throw UserError("所选记录已有变化，请重新选择。")
+        }
+        val previous = current.evidence.filter { it.recordId in ids }
+        db.withTransaction {
+            for (batch in ids.chunked(500)) dao.deleteRecords(batch)
+        }
         previous.forEach(evidence::remove)
         refresh()
+        ids.size
     }
 
     suspend fun deleteDraftFile(item: Evidence) = locked {
