@@ -6,17 +6,26 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -36,6 +45,8 @@ internal fun ShizhengApp(state: AppState) {
     val screen = state.screen
     val atRoot = screen == Screen.RECORDS || screen == Screen.MINE
     val selection = state.selectedRecordIds.takeIf { screen == Screen.RECORDS }
+    val recordScroll = rememberLazyListState()
+    val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     val results = if (screen == Screen.RECORDS) remember(data, state.filter) { state.filter.apply(data) } else emptyList()
     val visibleIds = remember(results) { results.mapTo(hashSetOf(), Record::id) }
     var deleteSelection by remember { mutableStateOf<Set<String>?>(null) }
@@ -129,31 +140,29 @@ internal fun ShizhengApp(state: AppState) {
         modifier = Modifier.fillMaxSize().imePadding(),
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        when {
+            val colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+            if (atRoot && selection == null) {
+                TopAppBar({ Text(screen.title, style = MaterialTheme.typography.headlineMedium) }, colors = colors)
+            } else {
+                CenterAlignedTopAppBar(
+                    title = {
+                        Text(when {
                             selection != null -> "已选 ${selection.size} 条"
                             screen == Screen.EDITOR -> if (state.editingExisting) "编辑记录" else "新建记录"
                             else -> screen.title
-                        }, fontWeight = FontWeight.SemiBold
-                    )
-                },
-                navigationIcon = {
-                    if (!atRoot || selection != null) IconButton(onClick = back) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, if (selection == null) "返回" else "退出多选")
-                    }
-                },
-                actions = {
-                    if (screen == Screen.RECORDS && state.ready && selection == null) {
-                        TextButton({ state.startSelectingRecords() }, enabled = results.isNotEmpty()) { Text("多选") }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-            )
+                        }, fontWeight = FontWeight.SemiBold)
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = back) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, if (selection == null) "返回" else "退出多选")
+                        }
+                    },
+                    colors = colors
+                )
+            }
         },
         bottomBar = {
-            if (selection != null) BottomAppBar {
+            if (selection != null) BottomAppBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     TextButton({ state.toggleAllRecords(visibleIds) }, enabled = visibleIds.isNotEmpty()) {
                         Text(if (visibleIds.isNotEmpty() && selection == visibleIds) "取消全选" else "全选")
@@ -164,34 +173,18 @@ internal fun ShizhengApp(state: AppState) {
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                     ) { Text("删除") }
                 }
-            } else if (atRoot) NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                NavigationBarItem(
-                    screen == Screen.RECORDS, { state.screen = Screen.RECORDS },
-                    icon = { Icon(Icons.AutoMirrored.Filled.List, null) }, label = { Text("记录") }
-                )
-                NavigationBarItem(
-                    screen == Screen.MINE, { state.screen = Screen.MINE },
-                    icon = { Icon(Icons.Default.Person, null) }, label = { Text("我的") }
-                )
-            }
-        },
-        floatingActionButton = {
-            if (screen == Screen.RECORDS && state.ready && selection == null) ExtendedFloatingActionButton(
-                text = { Text("新增") }, icon = { Icon(Icons.Default.Add, null) }, onClick = { state.editRecord() },
-                modifier = Modifier.semantics { contentDescription = "新增记录" },
-                containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary
-            )
+            } else if (atRoot && !keyboardVisible) RootNavigation(state)
         },
         snackbarHost = { SnackbarHost(snackbar) }
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
+        Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
             if (!state.ready) {
                 if (state.failedToLoad && !state.busy) Page {
                     Help("无法读取本地记录。")
-                    Button(state::load) { Text("重试") }
+                    PrimaryButton(state::load) { Text("重试") }
                 }
             } else when (screen) {
-                Screen.RECORDS -> RecordList(state, data, results)
+                Screen.RECORDS -> RecordList(state, data, results, recordScroll)
                 Screen.MINE -> Mine(state, data)
                 Screen.DETAIL -> data.records.firstOrNull { it.id == state.recordId }?.let { RecordDetail(state, data, it) }
                 Screen.EDITOR, Screen.EXTRAS -> state.draft?.let {
@@ -235,6 +228,60 @@ internal fun ShizhengApp(state: AppState) {
                 Text(if (state.ready) "正在处理…" else "正在读取本地记录…")
             }
         }
+    }
+}
+
+@Composable
+private fun RootNavigation(state: AppState) {
+    val onRecords = state.screen == Screen.RECORDS
+    Column(
+        Modifier.fillMaxWidth()
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
+            .padding(start = 20.dp, end = 20.dp, bottom = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(7.dp)
+    ) {
+        if (onRecords && state.ready) {
+            FloatingActionButton(
+                onClick = { state.editRecord() }, modifier = Modifier.align(Alignment.End).size(56.dp),
+                shape = CircleShape, containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                elevation = FloatingActionButtonDefaults.elevation(8.dp)
+            ) {
+                Icon(Icons.Default.Add, "新增记录", Modifier.size(30.dp))
+            }
+        }
+        Surface(
+            Modifier.widthIn(max = 336.dp).fillMaxWidth(0.78f),
+            shape = CircleShape, shadowElevation = 9.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Row(Modifier.selectableGroup().heightIn(min = 60.dp)) {
+                NavItem("记录", Icons.AutoMirrored.Filled.List, onRecords, Modifier.weight(1f)) { state.screen = Screen.RECORDS }
+                NavItem("我的", if (onRecords) Icons.Outlined.Person else Icons.Default.Person, !onRecords, Modifier.weight(1f)) {
+                    state.screen = Screen.MINE
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NavItem(label: String, icon: ImageVector, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    Box(
+        modifier.heightIn(min = 60.dp)
+            .selectable(selected, role = Role.Tab, onClick = onClick)
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center
+    ) {
+        if (selected) {
+            Surface(
+                Modifier.size(34.dp), shape = MaterialTheme.shapes.small,
+                color = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary
+            ) {
+                Box(contentAlignment = Alignment.Center) { Icon(icon, null, Modifier.size(23.dp)) }
+            }
+        } else Icon(icon, null, Modifier.size(25.dp))
     }
 }
 

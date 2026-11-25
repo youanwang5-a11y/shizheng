@@ -7,6 +7,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.UiDevice
 import app.shizheng.ai.AiClient
 import app.shizheng.ai.AiConfig
 import app.shizheng.ai.AiConfigStore
@@ -188,14 +189,14 @@ class RecordFlowTest {
         config.write(AiConfig())
         try {
             val state = render()
-            click("我的")
+            clickDescription("我的")
             click("学期管理")
             click("当前学期")
             click("大二上")
             clickDescription("返回")
-            click("记录")
+            clickDescription("记录")
             clickDescription("新增记录")
-            ui.onNode(hasSetTextAction() and hasText("名称 *")).performTextInput("设备测试·图书馆志愿服务")
+            ui.onNode(hasSetTextAction() and hasContentDescription("名称 *")).performTextInput("设备测试·图书馆志愿服务")
             click("类别 *")
             click("志愿服务")
             click("保存记录")
@@ -207,6 +208,10 @@ class RecordFlowTest {
             ui.onNode(hasSetTextAction()).performTextInput("没有匹配的关键字")
             waitFor("没有符合条件的记录")
             click("清空")
+            if (ui.onAllNodesWithContentDescription("新增记录").fetchSemanticsNodes().isEmpty()) {
+                UiDevice.getInstance(instrument).pressBack()
+            }
+            ui.waitUntil(12_000) { ui.onAllNodesWithContentDescription("新增记录").fetchSemanticsNodes().isNotEmpty() }
             clickDescription("新增记录")
             waitFor("AI 已关闭。")
             click("打开 AI 设置")
@@ -215,7 +220,7 @@ class RecordFlowTest {
             clickDescription("返回")
             waitFor("AI 已关闭。")
             clickDescription("返回")
-            click("我的")
+            clickDescription("我的")
             ui.onNodeWithText("AI 记录").assertDoesNotExist()
             click("AI 设置")
             waitFor("测试连接")
@@ -298,13 +303,18 @@ class RecordFlowTest {
             val state = render(AiClient(transport, builtInKey = "device-fixture-token"))
             val before = state.data.value.records.size
             clickDescription("新增记录")
-            ui.onNode(hasSetTextAction() and hasText("名称 *")).performScrollTo()
+            ui.onNode(hasSetTextAction() and hasContentDescription("名称 *")).performScrollTo()
                 .performTextInput("设备测试·已核对的竞赛")
-            ui.onNode(hasSetTextAction() and hasText("描述你的经历")).performScrollTo().performTextInput(input)
+            click("描述经历")
+            ui.onNode(hasSetTextAction() and hasText("描述你的经历")).performTextInput(input)
+            click("完成")
             ui.onNodeWithText("识别并填入").performScrollTo().performClick()
             waitFor("目标服务")
             assertEquals(0, requests.get())
             assertEquals(before, state.data.value.records.size)
+            click("取消")
+            assertEquals(0, requests.get())
+            click("识别并填入")
             click("确认发送并填写")
             waitFor("内置 DeepSeek 鉴权失败，请联系分发者。")
             ui.onNodeWithText("请核对识别结果").assertDoesNotExist()

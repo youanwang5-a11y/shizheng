@@ -1,56 +1,101 @@
 package app.shizheng.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import app.shizheng.R
 import app.shizheng.data.*
 
 @Composable
-internal fun RecordList(state: AppState, data: Snapshot, results: List<Record>) {
+internal fun RecordList(state: AppState, data: Snapshot, results: List<Record>, scroll: LazyListState) {
     var showFilters by remember { mutableStateOf(false) }
     val filter = state.filter
     val selection = state.selectedRecordIds
-    val filesByRecord = remember(data) { data.evidence.groupBy(Evidence::recordId) }
+    val filesByRecord = remember(data.evidence) {
+        data.evidence.groupBy(Evidence::recordId).mapValues { (_, files) -> files.sortedBy(Evidence::order) }
+    }
 
     LazyColumn(
-        Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+        Modifier.fillMaxSize(),
+        state = scroll,
         verticalArrangement = Arrangement.spacedBy(10.dp),
-        contentPadding = PaddingValues(top = 8.dp, bottom = if (selection == null) 102.dp else 12.dp)
+        contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 12.dp)
     ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     filter.query, { state.changeFilter(filter.copy(query = it.take(200))) },
-                    Modifier.fillMaxWidth(), singleLine = true, shape = MaterialTheme.shapes.large,
+                    Modifier.fillMaxWidth(), singleLine = true, shape = MaterialTheme.shapes.medium,
+                    colors = inputColors(),
+                    textStyle = MaterialTheme.typography.bodyMedium,
                     placeholder = { Text("搜索名称、单位或备注") },
                     leadingIcon = { Icon(Icons.Default.Search, "搜索记录") },
                     trailingIcon = {
                         if (filter.query.isNotEmpty()) TextButton({ state.changeFilter(filter.copy(query = "")) }) { Text("清空") }
                     }
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    itemVerticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                         for (status in ArchiveState.entries) {
-                            FilterChip(filter.state == status, { state.changeFilter(filter.copy(state = status)) }, { Text(status.label) })
+                            FilterChip(
+                                filter.state == status, { state.changeFilter(filter.copy(state = status)) }, { Text(status.label) },
+                                shape = MaterialTheme.shapes.extraLarge,
+                                colors = FilterChipDefaults.filterChipColors(
+                                    containerColor = MaterialTheme.colorScheme.surface,
+                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                                ),
+                                border = FilterChipDefaults.filterChipBorder(
+                                    selected = filter.state == status, enabled = true,
+                                    borderColor = MaterialTheme.colorScheme.outlineVariant
+                                )
+                            )
                         }
                     }
-                    TextButton({ showFilters = true }) { Text("筛选") }
+                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        ListAction("筛选", R.drawable.ic_filter) { showFilters = true }
+                        if (selection == null) ListAction("多选", R.drawable.ic_multiselect, results.isNotEmpty()) {
+                            state.startSelectingRecords()
+                        }
+                    }
                 }
                 val conditions = listOf(
                     filter.termIds.map(data::termName),
@@ -95,21 +140,50 @@ internal fun RecordList(state: AppState, data: Snapshot, results: List<Record>) 
             Surface(
                 modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large,
                 color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)),
+                shadowElevation = 2.dp
             ) {
-                Row(Modifier.then(action).padding(13.dp), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.then(action).padding(10.dp), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     if (selection != null) Checkbox(selected, onCheckedChange = null, modifier = Modifier.align(Alignment.CenterVertically))
-                    else EvidenceThumbnail(state.repository.evidence, files.minByOrNull(Evidence::order), record.category)
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Text(record.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
-                            maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        Help(listOfNotNull(data.categoryName(record.category), record.level?.label, dateLabel(record).takeIf(String::isNotEmpty)).joinToString(" · "))
-                        val extra = listOfNotNull(record.organization.takeIf(String::isNotBlank),
-                            files.size.takeIf { it > 0 }?.let { "$it 个证明" })
-                        if (extra.isNotEmpty()) Text(extra.joinToString(" · "), style = MaterialTheme.typography.bodySmall,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    else CategoryIllustration(record.category)
+                    BoxWithConstraints(Modifier.weight(1f)) {
+                        val inlineStatus = maxWidth >= 214.dp && LocalDensity.current.fontScale <= 1.25f
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.Top) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        record.title, style = MaterialTheme.typography.titleMedium,
+                                        fontSize = 18.sp, lineHeight = 23.sp, maxLines = 2, overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        listOfNotNull(data.categoryName(record.category), record.level?.label, shortDateLabel(record)).joinToString(" · "),
+                                        style = recordMetadataStyle, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 2, overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                if (inlineStatus) StatusPill(files.isNotEmpty())
+                                if (selection == null) Icon(
+                                    Icons.AutoMirrored.Filled.KeyboardArrowRight, null,
+                                    Modifier.size(17.dp).align(Alignment.CenterVertically)
+                                )
+                            }
+                            if (!inlineStatus) StatusPill(files.isNotEmpty())
+                            if (files.isNotEmpty()) {
+                                LazyRow(
+                                    Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                ) {
+                                    items(files, key = Evidence::id) { file ->
+                                        EvidenceThumbnail(
+                                            state.repository.evidence, file,
+                                            Modifier.size(width = if (file.kind == EvidenceKind.PHOTO) 64.dp else 48.dp, height = 48.dp),
+                                            onClick = if (selection == null) ({ state.preview(file) }) else null,
+                                            onLongClick = if (selection == null) ({ state.startSelectingRecords(record.id) }) else null
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
-                    StatusPill(files.isNotEmpty())
                 }
             }
         }
@@ -118,6 +192,39 @@ internal fun RecordList(state: AppState, data: Snapshot, results: List<Record>) 
         state.changeFilter(it)
         showFilters = false
     }
+}
+
+@Composable
+private fun ListAction(label: String, icon: Int, enabled: Boolean = true, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick, enabled = enabled, shape = MaterialTheme.shapes.small,
+        contentPadding = PaddingValues(horizontal = 7.dp),
+        colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Icon(painterResource(icon), null, Modifier.size(15.dp))
+        Spacer(Modifier.width(3.dp))
+        Text(label)
+    }
+}
+
+@Composable
+private fun CategoryIllustration(category: String) {
+    val illustration = when (category) {
+        Category.COMPETITION.name -> R.drawable.illustration_competition
+        Category.VOLUNTEER.name -> R.drawable.illustration_volunteer
+        Category.CULTURE.name -> R.drawable.illustration_culture
+        Category.PRACTICE.name -> R.drawable.illustration_practice
+        Category.RESEARCH.name -> R.drawable.illustration_research
+        Category.HONOR.name -> R.drawable.illustration_honor
+        Category.TRAINING.name -> R.drawable.illustration_training
+        Category.OTHER.name -> R.drawable.illustration_other
+        else -> R.drawable.illustration_custom
+    }
+    Image(
+        painterResource(illustration), null, Modifier.size(70.dp).clip(MaterialTheme.shapes.small),
+        contentScale = ContentScale.Crop
+    )
 }
 
 @Composable
@@ -196,9 +303,9 @@ internal fun EditRecord(
                         key(item.id) { EditableAttachment(state, item, index, draft.files.lastIndex) }
                     }
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        OutlinedButton(actions.camera) { Text("拍照") }
-                        OutlinedButton(actions.photos) { Text("相册") }
-                        OutlinedButton(actions.files) { Text("导入文件") }
+                        SecondaryButton(actions.camera) { Text("拍照") }
+                        SecondaryButton(actions.photos) { Text("相册") }
+                        SecondaryButton(actions.files) { Text("导入文件") }
                     }
                 }
             } else {
@@ -207,45 +314,107 @@ internal fun EditRecord(
                     Heading("请核对识别结果")
                     Help("请核对填入的信息。单位、结果和备注可在补充信息中查看。")
                 }
-                Field(draft.title, "名称 *", TITLE_LIMIT) { input -> state.updateDraft { it.copy(title = input) } }
-                Choice("类别 *", data.categoryName(draft.category) ?: "请选择", data.categories
-                    .filter { it.active || it.id == draft.category }.map { it.id to it.name }) { category ->
-                    state.updateDraft { it.copy(category = category) }
-                }
-                TextButton(state::openCategories, enabled = !state.aiWorking) { Text("管理类别") }
-                Choice("级别（选填）", draft.level?.label ?: "未选择", listOf(null to "未选择") + Level.entries.map { it to it.label }) { level ->
-                    state.updateDraft { it.copy(level = level) }
-                }
-                Panel {
-                    Heading("时间（选填）")
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(!draft.ranged, { state.updateDraft { it.copy(ranged = false) } }, { Text("单日") })
-                        FilterChip(draft.ranged, { state.updateDraft { it.copy(ranged = true) } }, { Text("时间段") })
-                    }
-                    DayField(if (draft.ranged) "开始日期" else "日期", draft.start) { day ->
-                        state.updateDraft { it.copy(start = day) }
-                    }
-                    if (draft.ranged) DayField("结束日期", draft.end, draft.start) { day ->
-                        state.updateDraft { it.copy(end = day) }
-                    }
-                    if (draft.start.isNotEmpty() || draft.end.isNotEmpty()) {
-                        TextButton({ state.updateDraft { it.copy(start = "", end = "", ranged = false) } }) { Text("清除日期") }
-                    }
-                }
-                val termOptions = listOf(null to "未归入学期") + data.terms.map { it.id to it.name }
-                Choice("学期", data.termName(draft.termId), termOptions) { id ->
-                    state.updateDraft { it.copy(termId = id) }
-                }
+                RecordForm(state, data, draft)
             }
         }
-        HorizontalDivider()
-        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Button(state::storeDraft, Modifier.fillMaxWidth(), enabled = !state.aiWorking) { Text("保存记录") }
-            if (!extras) OutlinedButton({ state.openExtras() }, Modifier.fillMaxWidth(), enabled = !state.aiWorking) {
-                Text("补充信息与证明（可选）")
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Column(Modifier.widthIn(max = 620.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                PrimaryButton(state::storeDraft, Modifier.fillMaxWidth(), enabled = !state.aiWorking) { Text("保存记录") }
+                if (!extras) SecondaryButton(state::openExtrasFromEditor, Modifier.fillMaxWidth(), enabled = !state.aiWorking) {
+                    Text("补充信息与证明（可选）")
+                }
             }
         }
     }
+}
+
+@Composable
+private fun RecordForm(state: AppState, data: Snapshot, draft: RecordDraft) {
+    val colors = MaterialTheme.colorScheme
+    val divider = colors.outlineVariant.copy(alpha = 0.64f)
+    Surface(
+        shape = MaterialTheme.shapes.large, color = colors.surface,
+        border = BorderStroke(1.dp, colors.outlineVariant)
+    ) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+            FormRow("名称 *") {
+                val style = MaterialTheme.typography.bodyMedium
+                val shape = MaterialTheme.shapes.small
+                val interaction = remember { MutableInteractionSource() }
+                val focused by interaction.collectIsFocusedAsState()
+                BasicTextField(
+                    value = draft.title,
+                    onValueChange = { if (it.length <= TITLE_LIMIT) state.updateDraft { d -> d.copy(title = it) } },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp).semantics { contentDescription = "名称 *" },
+                    singleLine = true, textStyle = style.copy(color = colors.onSurface),
+                    cursorBrush = SolidColor(colors.primary), interactionSource = interaction,
+                    decorationBox = { input ->
+                        Box(
+                            Modifier.background(colors.surfaceVariant, shape)
+                                .border(1.dp, if (focused) colors.primary else colors.outlineVariant, shape)
+                                .padding(horizontal = 10.dp, vertical = 5.dp),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            if (draft.title.isEmpty()) Text("请输入经历名称", style = style, color = colors.onSurfaceVariant)
+                            input()
+                        }
+                    }
+                )
+            }
+            HorizontalDivider(color = divider)
+            Choice(
+                "类别 *", data.categoryName(draft.category) ?: "请选择类别",
+                data.categories.filter { it.active || it.id == draft.category }.map { it.id to it.name },
+                compact = true, menuAction = if (state.aiWorking) null else ("管理类别" to state::openCategories)
+            ) { category -> state.updateDraft { it.copy(category = category) } }
+            HorizontalDivider(color = divider)
+            Choice(
+                "级别（选填）", draft.level?.label ?: "请选择级别",
+                listOf(null to "未选择") + Level.entries.map { it to it.label }, compact = true
+            ) { level -> state.updateDraft { it.copy(level = level) } }
+            HorizontalDivider(color = divider)
+            DateEntry(draft, state::updateDraft)
+            HorizontalDivider(color = divider)
+            Choice(
+                "学期", data.termName(draft.termId),
+                listOf(null to "未归入学期") + data.terms.map { it.id to it.name }, compact = true
+            ) { id -> state.updateDraft { it.copy(termId = id) } }
+        }
+    }
+}
+
+@Composable
+private fun DateEntry(draft: RecordDraft, update: ((RecordDraft) -> RecordDraft) -> Unit) {
+    var show by remember { mutableStateOf(false) }
+    val current = when {
+        draft.start.isEmpty() -> "请选择时间"
+        !draft.ranged || draft.end.isEmpty() -> draft.start
+        else -> "${draft.start} 至 ${draft.end}"
+    }
+    FormRow("时间（选填）", Modifier.clickable(role = Role.Button) { show = true }) { FormValue(current) }
+    if (show) AlertDialog(
+        onDismissRequest = { show = false },
+        title = { Text("选择时间") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(!draft.ranged, { update { it.copy(ranged = false) } }, { Text("单日") })
+                    FilterChip(draft.ranged, { update { it.copy(ranged = true) } }, { Text("时间段") })
+                }
+                DayField(if (draft.ranged) "开始日期" else "日期", draft.start) { day -> update { it.copy(start = day) } }
+                if (draft.ranged) DayField("结束日期", draft.end, draft.start) { day -> update { it.copy(end = day) } }
+            }
+        },
+        dismissButton = {
+            if (draft.start.isNotEmpty() || draft.end.isNotEmpty()) {
+                TextButton({ update { it.copy(start = "", end = "", ranged = false) }; show = false }) { Text("清除日期") }
+            }
+        },
+        confirmButton = { TextButton({ show = false }) { Text("完成") } }
+    )
 }
 
 @Composable
@@ -300,11 +469,11 @@ internal fun RecordDetail(state: AppState, data: Snapshot, record: Record) {
             Heading("证明附件 · ${files.size}")
             if (files.isEmpty()) Help("还没有证明，可以随时补充。")
             for (file in files) AttachmentRow(state.repository.evidence, file) { state.preview(file) }
-            OutlinedButton({ state.editRecord(record, extras = true) }, Modifier.fillMaxWidth()) {
+            SecondaryButton({ state.editRecord(record, extras = true) }, Modifier.fillMaxWidth()) {
                 Text(if (files.isEmpty()) "添加证明" else "管理证明")
             }
         }
-        Button({ state.editRecord(record) }, Modifier.fillMaxWidth()) { Text("编辑记录") }
+        PrimaryButton({ state.editRecord(record) }, Modifier.fillMaxWidth()) { Text("编辑记录") }
         TextButton({ delete = true }, Modifier.fillMaxWidth()) { Text("删除记录", color = MaterialTheme.colorScheme.error) }
         Spacer(Modifier.height(8.dp))
     }
@@ -323,3 +492,10 @@ private fun DetailLine(label: String, value: String) {
 }
 
 private fun dateLabel(record: Record) = record.end?.let { "${record.start} 至 $it" } ?: record.start
+
+private fun shortDateLabel(record: Record): String? {
+    val start = record.start.takeIf(String::isNotEmpty) ?: return null
+    val shortStart = start.drop(5).replace('-', '.')
+    val end = record.end ?: return shortStart
+    return if (start.take(4) == end.take(4)) "$shortStart–${end.drop(5).replace('-', '.')}" else dateLabel(record)
+}

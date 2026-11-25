@@ -62,7 +62,7 @@ internal fun Terms(state: AppState, data: Snapshot) {
             }
             Help("新增记录默认选择当前学期。每条记录都可以单独修改。")
         }
-        Button({
+        PrimaryButton({
             state.termDraft = Term(newId(), "", "", "", false)
             state.screen = Screen.TERM
         }, Modifier.fillMaxWidth()) { Text("新增自定义学期") }
@@ -80,7 +80,7 @@ internal fun TermEdit(state: AppState, term: Term) {
             Text("设为当前学期", Modifier.weight(1f))
             Switch(term.current, { state.termDraft = term.copy(current = it) })
         }
-        Button(state::saveTerm, Modifier.fillMaxWidth()) { Text("保存学期") }
+        PrimaryButton(state::saveTerm, Modifier.fillMaxWidth()) { Text("保存学期") }
     }
 }
 
@@ -91,7 +91,7 @@ internal fun Categories(state: AppState, data: Snapshot) {
     Page {
         Panel {
             Field(name, "新类别名称", CATEGORY_LIMIT) { name = it }
-            Button({ state.addCategory(name) { name = "" } }, Modifier.fillMaxWidth(), enabled = name.isNotBlank()) {
+            PrimaryButton({ state.addCategory(name) { name = "" } }, Modifier.fillMaxWidth(), enabled = name.isNotBlank()) {
                 Text("添加类别")
             }
         }
@@ -118,12 +118,12 @@ internal fun BackupScreen(state: AppState, create: () -> Unit, select: () -> Uni
         Panel {
             Heading("创建完整备份")
             Help("备份包含记录、学期、类别和证明原件。请选择保存位置并妥善保管，备份可以直接读取。")
-            Button(create, Modifier.fillMaxWidth()) { Text("保存备份") }
+            PrimaryButton(create, Modifier.fillMaxWidth()) { Text("保存备份") }
         }
         Panel {
             Heading("从备份恢复")
             Help("选择拾证备份，验证后可预览数量。确认恢复会替换手机里的记录、学期、类别和证明。")
-            OutlinedButton(select, Modifier.fillMaxWidth()) { Text("选择备份文件") }
+            SecondaryButton(select, Modifier.fillMaxWidth()) { Text("选择备份文件") }
         }
     }
     val incoming = state.prepared?.snapshot
@@ -134,7 +134,7 @@ internal fun BackupScreen(state: AppState, create: () -> Unit, select: () -> Uni
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Help("已通过校验 · ${incoming.records.size} 条记录、${incoming.terms.size} 个学期、${incoming.evidence.size} 个附件。")
                 Text("确认后将替换本机的记录、学期和证明。可以先保存一份本机备份。")
-                OutlinedButton(create, Modifier.fillMaxWidth(), enabled = !state.busy) { Text("先备份当前数据") }
+                SecondaryButton(create, Modifier.fillMaxWidth(), enabled = !state.busy) { Text("先备份当前数据") }
                 if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                 if (state.message == "备份已保存") Help("当前数据的备份已保存。")
             }

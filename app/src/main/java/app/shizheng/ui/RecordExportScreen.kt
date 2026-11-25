@@ -49,7 +49,7 @@ internal fun RecordExportScreen(data: Snapshot, export: (Set<String>) -> Unit) {
             }
         }
         HorizontalDivider()
-        Button(
+        PrimaryButton(
             onClick = { export(records.mapTo(hashSetOf(), Record::id)) },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
             enabled = records.isNotEmpty()

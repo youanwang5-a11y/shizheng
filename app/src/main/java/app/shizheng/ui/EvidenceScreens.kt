@@ -2,14 +2,13 @@ package app.shizheng.ui
 
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,10 +19,17 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.graphics.createBitmap
-import app.shizheng.data.Category
+import app.shizheng.R
 import app.shizheng.data.Evidence
 import app.shizheng.data.EvidenceKind
 import app.shizheng.data.EvidenceStore
@@ -36,31 +42,48 @@ import java.io.File
 internal data class EvidenceActions(val camera: () -> Unit, val photos: () -> Unit, val files: () -> Unit)
 
 @Composable
-internal fun EvidenceThumbnail(store: EvidenceStore, item: Evidence?, category: String? = null) {
-    val bitmap by produceState<Bitmap?>(null, item?.id) {
-        value = if (item?.kind == EvidenceKind.PHOTO) withContext(Dispatchers.IO) {
+internal fun EvidenceThumbnail(
+    store: EvidenceStore, item: Evidence, modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null, onLongClick: (() -> Unit)? = null
+) {
+    val bitmap by produceState<Bitmap?>(null, item.id) {
+        value = if (item.kind == EvidenceKind.PHOTO) withContext(Dispatchers.IO) {
             runCatching { decodePhoto(store.file(item), 160) }.getOrNull()
         } else null
     }
+    val click = if (onClick != null) Modifier.combinedClickable(
+        role = Role.Button, onClick = onClick, onLongClick = onLongClick, onLongClickLabel = "选择记录"
+    ).semantics { contentDescription = "预览${item.kind.label} · ${item.name}" } else Modifier
     Surface(
-        Modifier.size(47.dp), shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        modifier.size(47.dp), shape = MaterialTheme.shapes.extraSmall,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
-        val image = bitmap
-        if (image != null) Image(image.asImageBitmap(), "照片证明缩略图", contentScale = ContentScale.Crop)
-        else Box(contentAlignment = Alignment.Center) {
-            val kind = item?.kind
-            if (kind != null && kind != EvidenceKind.PHOTO) Text(kind.label, style = MaterialTheme.typography.labelMedium)
-            else Icon(
-                when (category) {
-                    Category.COMPETITION.name, Category.HONOR.name -> Icons.Default.Star
-                    Category.VOLUNTEER.name -> Icons.Default.Favorite
-                    Category.PRACTICE.name -> Icons.Default.Place
-                    Category.RESEARCH.name -> Icons.Default.Search
-                    Category.CULTURE.name -> Icons.Default.Face
-                    Category.TRAINING.name -> Icons.Default.Create
-                    else -> Icons.AutoMirrored.Filled.List
-                }, contentDescription = null, modifier = Modifier.size(22.dp)
+        Box(Modifier.fillMaxSize().then(click), contentAlignment = Alignment.Center) {
+            val image = bitmap
+            when {
+                image != null -> Image(image.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                item.kind == EvidenceKind.PHOTO -> Icon(painterResource(R.drawable.ic_photo), null, Modifier.size(23.dp))
+                item.kind == EvidenceKind.PDF -> FileMark(
+                    R.drawable.ic_pdf_document, "PDF", Alignment.BottomCenter
+                )
+                else -> FileMark(R.drawable.ic_word_document, "W", Alignment.TopCenter)
+            }
+        }
+    }
+}
+
+@Composable
+private fun FileMark(icon: Int, label: String, badgeAlignment: Alignment) {
+    Box(Modifier.size(31.dp).clearAndSetSemantics {}, contentAlignment = Alignment.Center) {
+        Icon(painterResource(icon), null, Modifier.size(27.dp), tint = MaterialTheme.colorScheme.secondary)
+        Surface(
+            Modifier.align(badgeAlignment), shape = MaterialTheme.shapes.extraSmall,
+            color = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary
+        ) {
+            Text(
+                label, Modifier.padding(horizontal = 4.dp), fontWeight = FontWeight.Bold,
+                fontSize = 10.sp, lineHeight = 12.sp, maxLines = 1
             )
         }
     }
@@ -95,7 +118,7 @@ internal fun EvidencePreview(state: AppState, item: Evidence, exportFile: (Evide
                 Text(item.name, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Help("双指缩放，双击切换缩放。")
                 Box(Modifier.weight(1f).fillMaxWidth()) { Display(preview, "照片证明") }
-                OutlinedButton({ exportFile(item) }, Modifier.fillMaxWidth()) { Text("另存照片") }
+                SecondaryButton({ exportFile(item) }, Modifier.fillMaxWidth()) { Text("另存照片") }
             }
         }
         EvidenceKind.PDF -> PdfPreview(file, item.name) { exportFile(item) }
@@ -103,8 +126,8 @@ internal fun EvidencePreview(state: AppState, item: Evidence, exportFile: (Evide
             Panel {
                 Heading(item.name)
                 Help("可交由手机上的 Word 兼容应用打开，也可另存原文件。")
-                Button({ state.openWord(item) }, Modifier.fillMaxWidth()) { Text("用其他应用打开") }
-                OutlinedButton({ exportFile(item) }, Modifier.fillMaxWidth()) { Text("另存 Word 文件") }
+                PrimaryButton({ state.openWord(item) }, Modifier.fillMaxWidth()) { Text("用其他应用打开") }
+                SecondaryButton({ exportFile(item) }, Modifier.fillMaxWidth()) { Text("另存 Word 文件") }
             }
         }
     }
@@ -132,7 +155,7 @@ private fun PdfPreview(file: File, name: String, exportFile: () -> Unit) {
             Text("${index + 1} / $pageCount")
             TextButton({ index++ }, enabled = index + 1 < pageCount) { Text("下一页") }
         }
-        OutlinedButton(exportFile, Modifier.fillMaxWidth()) { Text("另存 PDF") }
+        SecondaryButton(exportFile, Modifier.fillMaxWidth()) { Text("另存 PDF") }
     }
 }
 

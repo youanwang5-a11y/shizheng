@@ -31,7 +31,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 internal enum class Screen(val title: String) {
-    RECORDS("拾证"), MINE("我的"), DETAIL("记录详情"), EDITOR("录入记录"),
+    RECORDS("记录"), MINE("我的"), DETAIL("记录详情"), EDITOR("录入记录"),
     EXTRAS("补充信息与证明"), PREVIEW("证明预览"), TERMS("学期管理"), TERM("编辑学期"),
     EXPORT("导出记录"), BACKUP("备份与恢复"), AI_SETTINGS("AI 设置"), CATEGORIES("类别管理"), ABOUT("关于应用")
 }
@@ -170,7 +170,9 @@ internal class AppState @JvmOverloads constructor(
         if (extras) openExtras(editorReturn) else screen = Screen.EDITOR
     }
 
-    fun openExtras(returnTo: Screen = Screen.EDITOR) {
+    fun openExtrasFromEditor() = openExtras(Screen.EDITOR)
+
+    private fun openExtras(returnTo: Screen) {
         extrasReturn = returnTo
         screen = Screen.EXTRAS
     }
