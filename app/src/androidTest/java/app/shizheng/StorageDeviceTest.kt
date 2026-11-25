@@ -40,7 +40,7 @@ class StorageDeviceTest {
         val arranged = listOf(added[2].copy(name = "已核对的说明.docx"), added[0], added[1])
         repository.save(draft.copy(files = arranged, notes = "已编辑备注"))
         assertEquals(added.map { it.kind }, listOf(EvidenceKind.PHOTO, EvidenceKind.PDF, EvidenceKind.DOCX))
-        assertTrue(RecordFilter("实验组", Category.VOLUNTEER.name, Level.SCHOOL, term.id, ArchiveState.ARCHIVED)
+        assertTrue(RecordFilter("实验组", setOf(Category.VOLUNTEER.name), setOf(Level.SCHOOL), setOf(term.id), ArchiveState.ARCHIVED)
             .apply(repository.data.value).any { it.id == draft.id })
         for (source in sources) assertArrayEquals(original.getValue(source.name), source.readBytes())
         val restarted = RecordRepository(context)

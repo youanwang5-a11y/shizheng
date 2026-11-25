@@ -13,20 +13,14 @@ import androidx.compose.ui.unit.dp
 import app.shizheng.data.Record
 import app.shizheng.data.RecordFilter
 import app.shizheng.data.Snapshot
-import app.shizheng.data.Term
-import app.shizheng.data.defaultTerms
+import app.shizheng.data.academicYearOptions
 
 @Composable
 internal fun RecordExportScreen(data: Snapshot, export: (Set<String>) -> Unit) {
     var scope by rememberSaveable(stateSaver = listSaver<Set<String>, String>(
         save = { it.toList() }, restore = { it.toSet() }
     )) { mutableStateOf(emptySet()) }
-    val termsByName = remember(data.terms) { data.terms.associateBy(Term::name) }
-    val academicYears = remember(termsByName) {
-        defaultTerms.chunked(2).map { pair ->
-            pair.mapNotNull { termsByName[it.name]?.id }.toSet() to pair.first().name.removeSuffix("上")
-        }.filter { it.first.isNotEmpty() }
-    }
+    val academicYears = remember(data.terms) { data.terms.academicYearOptions() }
     val recordsByTerm = remember(data.records) { data.records.groupBy { it.termId ?: RecordFilter.NO_TERM } }
     val records = remember(scope, recordsByTerm) { scope.flatMap { recordsByTerm[it].orEmpty() } }
 

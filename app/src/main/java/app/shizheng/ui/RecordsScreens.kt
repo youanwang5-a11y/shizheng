@@ -5,7 +5,9 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
@@ -50,8 +52,17 @@ internal fun RecordList(state: AppState, data: Snapshot, results: List<Record>) 
                     }
                     TextButton({ showFilters = true }) { Text("筛选") }
                 }
-                val conditions = listOfNotNull(data.categoryName(filter.category), filter.level?.label, filter.termId?.let(data::termName))
-                if (conditions.isNotEmpty()) Help(conditions.joinToString(" · "))
+                val conditions = listOf(
+                    filter.termIds.map(data::termName),
+                    filter.categories.mapNotNull(data::categoryName),
+                    filter.levels.map(Level::label)
+                ).filter { it.isNotEmpty() }
+                if (conditions.isNotEmpty()) Text(
+                    conditions.joinToString(" · ") { it.joinToString("、") },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis
+                )
                 if (results.isNotEmpty()) Help("${results.size} 条记录")
             }
         }
@@ -112,28 +123,60 @@ internal fun RecordList(state: AppState, data: Snapshot, results: List<Record>) 
 @Composable
 private fun FilterDialog(filter: RecordFilter, data: Snapshot, dismiss: () -> Unit, apply: (RecordFilter) -> Unit) {
     var selected by remember { mutableStateOf(filter) }
+    val years = remember(data.terms) { data.terms.academicYearOptions() }
+    val categoryOptions = remember(data.categories, data.records) {
+        val used = data.records.mapTo(hashSetOf(), Record::category)
+        data.categories.filter { it.active || it.id in used }
+            .map { it.id to if (it.active) it.name else "${it.name}（已删除）" }
+    }
     AlertDialog(
         onDismissRequest = dismiss, title = { Text("筛选记录") },
         text = {
-            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                val filters = data.categories.filter { it.active || data.records.any { record -> record.category == it.id } }
-                Choice("类别", data.categoryName(selected.category) ?: "不限", listOf(null to "不限") +
-                    filters.map { it.id to if (it.active) it.name else "${it.name}（已删除）" }) {
-                    selected = selected.copy(category = it)
+            Column(
+                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Help("同一组可勾选多项，匹配任一项即可。未勾选的组不限。")
+                if (years.isNotEmpty()) {
+                    Column {
+                        Heading("学年")
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            for ((termIds, name) in years) {
+                                val included = selected.termIds.containsAll(termIds)
+                                FilterChip(included, {
+                                    val terms = if (included) selected.termIds - termIds else selected.termIds + termIds
+                                    selected = selected.copy(termIds = terms)
+                                }, { Text("${name}学年") })
+                            }
+                        }
+                    }
                 }
-                Choice("级别", selected.level?.label ?: "不限", listOf(null to "不限") + Level.entries.map { it to it.label }) {
-                    selected = selected.copy(level = it)
+                FilterOptions("学期", selected.termIds,
+                    data.terms.map { it.id to it.name } + (RecordFilter.NO_TERM to "未归入学期")) {
+                    selected = selected.copy(termIds = it)
                 }
-                Choice(
-                    "学期", selected.termId?.let(data::termName) ?: "不限",
-                    listOf(null to "不限", RecordFilter.NO_TERM to "未归入学期") + data.terms.map { it.id to it.name }
-                ) { selected = selected.copy(termId = it) }
+                FilterOptions("类别", selected.categories, categoryOptions) { selected = selected.copy(categories = it) }
+                FilterOptions("级别", selected.levels, Level.entries.map { it to it.label }) { selected = selected.copy(levels = it) }
                 Choice("状态", selected.state.label, ArchiveState.entries.map { it to it.label }) { selected = selected.copy(state = it) }
             }
         },
         dismissButton = { TextButton({ apply(RecordFilter(query = filter.query)) }) { Text("清除筛选") } },
         confirmButton = { TextButton({ apply(selected) }) { Text("应用筛选") } }
     )
+}
+
+@Composable
+private fun <T> FilterOptions(title: String, selected: Set<T>, options: List<Pair<T, String>>, update: (Set<T>) -> Unit) {
+    if (options.isEmpty()) return
+    Column {
+        Heading(title)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            for ((id, label) in options) {
+                val included = id in selected
+                FilterChip(included, { update(if (included) selected - id else selected + id) }, { Text(label) })
+            }
+        }
+    }
 }
 
 @Composable

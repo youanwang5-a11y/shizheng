@@ -60,6 +60,13 @@ val defaultTerms = listOf("一", "二", "三", "四", "五").flatMap { year ->
 internal fun List<Term>.missingDefaultTerms(): List<Term> =
     defaultTerms.filter { preset -> none { it.name == preset.name || it.id == preset.id } }
 
+internal fun List<Term>.academicYearOptions(): List<Pair<Set<String>, String>> {
+    val termsByName = associateBy(Term::name)
+    return defaultTerms.chunked(2).map { pair ->
+        pair.mapNotNull { termsByName[it.name]?.id }.toSet() to pair.first().name.removeSuffix("上")
+    }.filter { it.first.isNotEmpty() }
+}
+
 @Serializable
 @Entity(
     tableName = "records",
@@ -159,9 +166,9 @@ data class RecordDraft(
 
 data class RecordFilter(
     val query: String = "",
-    val category: String? = null,
-    val level: Level? = null,
-    val termId: String? = null,
+    val categories: Set<String> = emptySet(),
+    val levels: Set<Level> = emptySet(),
+    val termIds: Set<String> = emptySet(),
     val state: ArchiveState = ArchiveState.ALL
 ) {
     fun apply(snapshot: Snapshot): List<Record> {
@@ -169,9 +176,9 @@ data class RecordFilter(
         val keyword = query.trim()
         return snapshot.records.asSequence().filter { record ->
             val archived = record.id in archivedIds
-            (category == null || record.category == category) &&
-                (level == null || record.level == level) &&
-                (termId == null || (record.termId ?: NO_TERM) == termId) &&
+            (categories.isEmpty() || record.category in categories) &&
+                (levels.isEmpty() || record.level in levels) &&
+                (termIds.isEmpty() || (record.termId ?: NO_TERM) in termIds) &&
                 (state == ArchiveState.ALL || archived == (state == ArchiveState.ARCHIVED)) &&
                 listOf(record.title, record.organization, record.notes).any { it.contains(keyword, ignoreCase = true) }
         }.sortedWith(compareByDescending<Record> { it.start }.thenByDescending { it.end ?: it.start }.thenBy { it.title })

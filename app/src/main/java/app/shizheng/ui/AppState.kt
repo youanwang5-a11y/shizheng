@@ -351,7 +351,7 @@ internal class AppState @JvmOverloads constructor(
 
     fun deleteCategory(id: String) = operation("无法删除类别。") {
         repository.deleteCategory(id)
-        if (filter.category == id) changeFilter(filter.copy(category = null))
+        if (id in filter.categories) changeFilter(filter.copy(categories = filter.categories - id))
         if (original?.category != id) updateDraft { if (it.category == id) it.copy(category = null) else it }
         message = "类别已删除"
     }

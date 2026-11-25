@@ -9,10 +9,12 @@ import app.shizheng.ai.AiClient
 import app.shizheng.ai.AiConfig
 import app.shizheng.ai.AiConfigStore
 import app.shizheng.data.Category
+import app.shizheng.data.Level
 import app.shizheng.data.RecordDraft
 import app.shizheng.data.RecordFilter
 import app.shizheng.data.Snapshot
 import app.shizheng.data.defaultTerms
+import app.shizheng.data.newId
 import app.shizheng.ui.RecordExportScreen
 import app.shizheng.ui.AppState
 import app.shizheng.ui.ShizhengApp
@@ -136,6 +138,44 @@ class RecordFlowTest {
             assertEquals(listOf(drafts.last().id), state.data.value.records.map { it.id }.filter { id -> drafts.any { it.id == id } })
         } finally {
             val remaining = state.data.value.records.map { it.id }.filter { id -> drafts.any { it.id == id } }.toSet()
+            kotlinx.coroutines.runBlocking { state.repository.deleteRecords(remaining) }
+        }
+    }
+
+    @Test fun combinesAcademicYearsTermsCategoriesAndLevelsBeforeSelectingAll() {
+        val state = render()
+        val terms = state.data.value.terms.associateBy { it.name }
+        val base = RecordDraft(category = Category.VOLUNTEER.name, level = Level.SCHOOL)
+        val drafts = listOf(
+            base.copy(title = "组合候选甲", termId = terms.getValue("大一上").id),
+            base.copy(title = "组合候选乙", termId = terms.getValue("大一下").id, category = Category.COMPETITION.name),
+            base.copy(title = "组合候选丙", termId = terms.getValue("大二上").id, level = Level.FACULTY),
+            base.copy(title = "组合候选丁", termId = terms.getValue("大二下").id),
+            base.copy(title = "组合候选戊", termId = terms.getValue("大一上").id, category = Category.RESEARCH.name)
+        ).map { it.copy(id = newId()) }
+        try {
+            kotlinx.coroutines.runBlocking { drafts.forEach { state.repository.save(it) } }
+            ui.runOnIdle { state.changeFilter(RecordFilter(query = "组合候选")) }
+            click("筛选")
+            for (label in listOf("大一学年", "大二学年", "大二下", "竞赛", "志愿服务", "校级", "院级")) {
+                ui.onNodeWithText(label).performScrollTo().performClick()
+            }
+            click("应用筛选")
+            waitFor("3 条记录")
+            assertEquals(drafts.take(3).map { it.id }.toSet(), state.filter.apply(state.data.value).map { it.id }.toSet())
+            click("多选")
+            click("全选")
+            waitFor("已选 3 条")
+            assertEquals(drafts.take(3).map { it.id }.toSet(), state.selectedRecordIds)
+            ui.onNodeWithText("导出").assertIsEnabled()
+            clickDescription("退出多选")
+            click("筛选")
+            click("清除筛选")
+            waitFor("5 条记录")
+            assertEquals("组合候选", state.filter.query)
+        } finally {
+            val ids = drafts.map { it.id }.toSet()
+            val remaining = state.data.value.records.map { it.id }.filter { it in ids }.toSet()
             kotlinx.coroutines.runBlocking { state.repository.deleteRecords(remaining) }
         }
     }

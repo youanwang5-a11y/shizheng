@@ -46,12 +46,30 @@ class RecordRulesTest {
         val another = input.copy(id = newId(), title = "数学竞赛", start = "2026-11-20", category = Category.COMPETITION.name).toRecord(terms)
         val attachment = Evidence(newId(), record.id, "证明.pdf", EvidenceKind.PDF, 0, 38, "a".repeat(64))
         val archived = Snapshot(terms, listOf(record, another), listOf(attachment))
-        val filter = RecordFilter("周三", Category.VOLUNTEER.name, Level.SCHOOL, autumn.id, ArchiveState.ARCHIVED)
+        val filter = RecordFilter("周三", setOf(Category.VOLUNTEER.name), setOf(Level.SCHOOL), setOf(autumn.id), ArchiveState.ARCHIVED)
         assertEquals(listOf(record), filter.apply(archived))
         assertEquals(listOf(record), filter.copy(query = "图书馆").apply(archived))
         val pending = archived.copy(evidence = emptyList())
         assertTrue(filter.apply(pending).isEmpty())
         assertEquals(listOf(record), filter.copy(state = ArchiveState.PENDING).apply(pending))
         assertEquals(listOf(another, record), RecordFilter().apply(pending))
+    }
+
+    @Test fun matchesAnyValueWithinEachGroupAndRequiresAllGroups() {
+        val base = input.copy(category = Category.VOLUNTEER.name, termId = autumn.id, level = Level.SCHOOL)
+            .toRecord(listOf(autumn, spring))
+        val second = base.copy(id = newId(), category = Category.COMPETITION.name, termId = spring.id, level = Level.FACULTY)
+        val unassigned = base.copy(id = newId(), termId = null)
+        val wrongCategory = base.copy(id = newId(), category = Category.OTHER.name)
+        val wrongLevel = base.copy(id = newId(), level = null)
+        val data = Snapshot(terms = listOf(autumn, spring), records = listOf(base, second, unassigned, wrongCategory, wrongLevel))
+        val filter = RecordFilter(
+            categories = setOf(Category.VOLUNTEER.name, Category.COMPETITION.name),
+            levels = setOf(Level.SCHOOL, Level.FACULTY),
+            termIds = setOf(autumn.id, spring.id)
+        )
+        assertEquals(setOf(base, second), filter.apply(data).toSet())
+        assertEquals(setOf(base, second, unassigned), filter.copy(termIds = filter.termIds + RecordFilter.NO_TERM).apply(data).toSet())
+        assertEquals(setOf(base, second, wrongLevel), filter.copy(levels = emptySet()).apply(data).toSet())
     }
 }
