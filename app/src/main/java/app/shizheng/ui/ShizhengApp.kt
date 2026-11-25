@@ -1,5 +1,7 @@
 package app.shizheng.ui
 
+import android.app.Activity
+import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -89,13 +91,14 @@ internal fun ShizhengApp(state: AppState) {
             }
         }
     )
-    val saveDoc = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(EvidenceKind.DOC.mime), state::saveWord)
-    val saveDocx = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(EvidenceKind.DOCX.mime), state::saveWord)
-    val exportWord: (Evidence) -> Unit = { item ->
-        state.exportEvidence = item
-        val extension = "." + item.kind.extension
-        val name = if (item.name.endsWith(extension, ignoreCase = true)) item.name else item.name + extension
-        launchPicker(state) { if (item.kind == EvidenceKind.DOC) saveDoc.launch(name) else saveDocx.launch(name) }
+    val saveFile = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        state.saveEvidence(result.data?.data?.takeIf { result.resultCode == Activity.RESULT_OK })
+    }
+    val exportFile: (Evidence) -> Unit = { item ->
+        state.prepareEvidenceExport(item) { name, mime ->
+            saveFile.launch(Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+                .setType(mime).putExtra(Intent.EXTRA_TITLE, name))
+        }
     }
     val createBackup = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) {
         it?.let(state::backup)
@@ -155,7 +158,7 @@ internal fun ShizhengApp(state: AppState) {
                 Screen.MINE -> Mine(state, data)
                 Screen.DETAIL -> data.records.firstOrNull { it.id == state.recordId }?.let { RecordDetail(state, data, it) }
                 Screen.EDITOR, Screen.EXTRAS -> state.draft?.let { EditRecord(state, data, it, screen == Screen.EXTRAS, actions) }
-                Screen.PREVIEW -> state.shownEvidence?.let { EvidencePreview(state, it, exportWord) }
+                Screen.PREVIEW -> state.shownEvidence?.let { EvidencePreview(state, it, exportFile) }
                 Screen.TERMS -> Terms(state, data)
                 Screen.TERM -> state.termDraft?.let { TermEdit(state, it) }
                 Screen.BACKUP -> BackupScreen(state, backup) {

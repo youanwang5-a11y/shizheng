@@ -3,6 +3,7 @@ package app.shizheng.data
 import android.content.ContentResolver
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
@@ -80,6 +81,27 @@ class EvidenceStore(private val context: Context) {
         context.contentResolver.openOutputStream(uri, "wt")?.use { output ->
             target.inputStream().use { it.copyTo(output) }
         } ?: throw UserError("无法写入选中的位置。")
+    }
+
+    fun exportNameAndType(item: Evidence): Pair<String, String> {
+        val source = file(item)
+        if (!source.isFile || !source.canRead()) throw UserError("应用内的附件不可读。")
+        val mime = if (item.kind == EvidenceKind.PHOTO) {
+            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(source.path, options)
+            options.outMimeType ?: "application/octet-stream"
+        } else item.kind.mime
+        val extensions = when (mime) {
+            "image/jpeg" -> listOf("jpg", "jpeg")
+            "image/heif", "image/heic" -> listOf("heic", "heif")
+            "image/x-ms-bmp" -> listOf("bmp")
+            "application/octet-stream" -> emptyList()
+            else -> listOf(if (item.kind == EvidenceKind.PHOTO) mime.substringAfter('/') else item.kind.extension)
+        }
+        val current = item.name.substringAfterLast('.', "")
+        val name = if (extensions.isEmpty() || extensions.any { it.equals(current, ignoreCase = true) }) item.name
+            else item.name + "." + extensions.first()
+        return name to mime
     }
 }
 

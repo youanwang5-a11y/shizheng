@@ -78,6 +78,7 @@ internal class AppState @JvmOverloads constructor(app: Application, private val 
         private set
     var captureFile: File? = null
     var exportEvidence: Evidence? = null
+        private set
 
     init { load() }
 
@@ -222,7 +223,19 @@ internal class AppState @JvmOverloads constructor(app: Application, private val 
         }
     }
 
-    fun saveWord(uri: Uri?) {
+    fun prepareEvidenceExport(item: Evidence, launch: (String, String) -> Unit) =
+        operation("无法打开系统文件选择器。") {
+            val (name, mime) = withContext(Dispatchers.IO) { repository.evidence.exportNameAndType(item) }
+            exportEvidence = item
+            try {
+                launch(name, mime)
+            } catch (error: Exception) {
+                exportEvidence = null
+                throw error
+            }
+        }
+
+    fun saveEvidence(uri: Uri?) {
         val item = exportEvidence
         exportEvidence = null
         if (uri == null || item == null) return

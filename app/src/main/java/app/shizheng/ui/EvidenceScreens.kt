@@ -84,7 +84,7 @@ internal fun AttachmentRow(store: EvidenceStore, item: Evidence, click: () -> Un
 }
 
 @Composable
-internal fun EvidencePreview(state: AppState, item: Evidence, saveWord: (Evidence) -> Unit) {
+internal fun EvidencePreview(state: AppState, item: Evidence, exportFile: (Evidence) -> Unit) {
     val file = state.repository.evidence.file(item)
     when (item.kind) {
         EvidenceKind.PHOTO -> {
@@ -95,22 +95,23 @@ internal fun EvidencePreview(state: AppState, item: Evidence, saveWord: (Evidenc
                 Text(item.name, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Help("双指缩放，双击切换缩放。")
                 Box(Modifier.weight(1f).fillMaxWidth()) { Display(preview, "照片证明") }
+                OutlinedButton({ exportFile(item) }, Modifier.fillMaxWidth()) { Text("另存照片") }
             }
         }
-        EvidenceKind.PDF -> PdfPreview(file, item.name)
+        EvidenceKind.PDF -> PdfPreview(file, item.name) { exportFile(item) }
         EvidenceKind.DOC, EvidenceKind.DOCX -> Page {
             Panel {
                 Heading(item.name)
                 Help("可交由手机上的 Word 兼容应用打开，也可另存原文件。")
                 Button({ state.openWord(item) }, Modifier.fillMaxWidth()) { Text("用其他应用打开") }
-                OutlinedButton({ saveWord(item) }, Modifier.fillMaxWidth()) { Text("另存 Word 文件") }
+                OutlinedButton({ exportFile(item) }, Modifier.fillMaxWidth()) { Text("另存 Word 文件") }
             }
         }
     }
 }
 
 @Composable
-private fun PdfPreview(file: File, name: String) {
+private fun PdfPreview(file: File, name: String, exportFile: () -> Unit) {
     var index by remember(file) { mutableIntStateOf(0) }
     var pageCount by remember(file) { mutableIntStateOf(0) }
     val preview by produceState<Result<Bitmap>?>(null, file, index) {
@@ -131,6 +132,7 @@ private fun PdfPreview(file: File, name: String) {
             Text("${index + 1} / $pageCount")
             TextButton({ index++ }, enabled = index + 1 < pageCount) { Text("下一页") }
         }
+        OutlinedButton(exportFile, Modifier.fillMaxWidth()) { Text("另存 PDF") }
     }
 }
 
