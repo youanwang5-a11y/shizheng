@@ -1,5 +1,19 @@
 # 拾证版本索引
 
+## v0.3.0 · 2026-11-25
+
+| 项目 | 值 |
+| --- | --- |
+| 构建提交 | `a948a2a7ee71e4e2581e8c3040fb4163ea086c67`，与 APK 中嵌入的 Git 信息一致 |
+| Git 标签 | `v0.3.0`，包含交付文档 |
+| 私测 APK | `releases/v0.3.0/shizheng-0.3.0.apk` |
+| APK SHA-256 | `d461b08338bb0a08469d11f1df01d0639a1896d1e23be47ca256cbe0b166121f` |
+| 应用信息 | `app.shizheng`，版本 `0.3.0`（版本码 3），Android 9 及以上 |
+| 签名 | 沿用分发签名，RSA 3072，APK Signature Scheme v3 |
+| 本地归档 | `releases/v0.3.0/shizheng-v0.3.0.bundle`、`SHA256SUMS.txt`、`verification/` |
+
+支持覆盖安装 0.2.0。Room 仍为 2，保存完整备份仍用格式 2，可恢复格式 1 或 2。私测 APK 含共享 DeepSeek 凭据，仅用于受控分发。 [测试报告](TEST_REPORT.md)
+
 ## v0.2.0 · 2026-11-25
 
 | 项目 | 值 |
@@ -46,9 +60,9 @@ Windows 当前账户的签名目录为 `C:\Users\1\AppData\Local\Shizheng\signin
 
 脚本先对齐 APK，使用专用分发密钥签名，再验证签名并输出 SHA-256。选用同一 Windows 用户下的备份签名目录也可恢复签名流程。
 
-## 重建 0.2.0 私测包
+## 重建私测包
 
-构建提交为 `ccc495bae0e337a2c6973c904aa2b3f500981832`。当前 Windows 用户的凭据输入存放在被 Git 忽略的 `private/deepseek.dpapi`。它与 PKCS#12 签名文件独立，由当前用户的 DPAPI 保护。另一台机器由有权限的分发者通过密码管理器取得有效的 DeepSeek 凭据，再用 `Read-Host -AsSecureString | ConvertFrom-SecureString | Set-Content private/deepseek.dpapi` 生成本机输入。公开构建时省略注入步骤。
+先切换到目标版本表中的构建提交。当前 Windows 用户的凭据输入存放在被 Git 忽略的 `private/deepseek.dpapi`。它与 PKCS#12 签名文件独立，由当前用户的 DPAPI 保护。另一台机器由有权限的分发者通过密码管理器取得有效的 DeepSeek 凭据，再用 `Read-Host -AsSecureString | ConvertFrom-SecureString | Set-Content private/deepseek.dpapi` 生成本机输入。公开构建时省略注入步骤。
 
 ```powershell
 $shizhengSecret = ConvertTo-SecureString (Get-Content -LiteralPath 'private/deepseek.dpapi' -Raw).Trim()
@@ -62,5 +76,5 @@ try {
     [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($shizhengPointer)
     $shizhengSecret.Dispose()
 }
-.\scripts\Sign-Release.ps1 -InputApk app/build/outputs/apk/release/app-release-unsigned.apk -OutputApk releases/rebuild/shizheng-0.2.0.apk -AndroidSdk $env:ANDROID_HOME
+.\scripts\Sign-Release.ps1 -InputApk app/build/outputs/apk/release/app-release-unsigned.apk -OutputApk releases/rebuild/shizheng-0.3.0.apk -AndroidSdk $env:ANDROID_HOME
 ```
