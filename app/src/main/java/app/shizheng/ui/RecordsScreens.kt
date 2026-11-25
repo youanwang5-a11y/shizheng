@@ -241,7 +241,7 @@ internal fun EditRecord(
         HorizontalDivider()
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Button(state::storeDraft, Modifier.fillMaxWidth(), enabled = !state.aiWorking) { Text("保存记录") }
-            if (!extras) OutlinedButton({ state.screen = Screen.EXTRAS }, Modifier.fillMaxWidth(), enabled = !state.aiWorking) {
+            if (!extras) OutlinedButton({ state.openExtras() }, Modifier.fillMaxWidth(), enabled = !state.aiWorking) {
                 Text("补充信息与证明（可选）")
             }
         }

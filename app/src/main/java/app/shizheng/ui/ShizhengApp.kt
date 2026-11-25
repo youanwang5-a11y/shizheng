@@ -55,8 +55,11 @@ internal fun ShizhengApp(state: AppState) {
             else when (screen) {
                 Screen.DETAIL -> state.screen = state.detailReturn
                 Screen.PREVIEW -> state.closePreview()
-                Screen.EXTRAS -> state.screen = Screen.EDITOR
-                Screen.EDITOR -> if (state.unsaved) leaveEditor = true else state.discardDraft()
+                Screen.EXTRAS, Screen.EDITOR -> {
+                    if (screen == Screen.EXTRAS && state.extrasReturn == Screen.EDITOR) state.screen = Screen.EDITOR
+                    else if (state.unsaved) leaveEditor = true
+                    else state.discardDraft()
+                }
                 Screen.TERM -> { state.termDraft = null; state.screen = Screen.TERMS }
                 Screen.CATEGORIES -> state.screen = state.categoriesReturn
                 Screen.AI_SETTINGS -> if (state.aiSettingsDirty) leaveSettings = true else state.screen = state.settingsReturn

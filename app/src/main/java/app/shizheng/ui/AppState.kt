@@ -81,6 +81,8 @@ internal class AppState @JvmOverloads constructor(
     var draft by mutableStateOf<RecordDraft?>(null)
     private var original: RecordDraft? = null
     private var editorReturn = Screen.RECORDS
+    var extrasReturn by mutableStateOf(Screen.EDITOR)
+        private set
     var reviewingAi by mutableStateOf(false)
         private set
     val editingExisting get() = editorReturn == Screen.DETAIL
@@ -165,7 +167,12 @@ internal class AppState @JvmOverloads constructor(
         draft = initial
         original = initial
         editorReturn = if (record == null) Screen.RECORDS else Screen.DETAIL
-        screen = if (extras) Screen.EXTRAS else Screen.EDITOR
+        if (extras) openExtras(editorReturn) else screen = Screen.EDITOR
+    }
+
+    fun openExtras(returnTo: Screen = Screen.EDITOR) {
+        extrasReturn = returnTo
+        screen = Screen.EXTRAS
     }
 
     fun updateDraft(change: (RecordDraft) -> RecordDraft) { draft = draft?.let(change) }

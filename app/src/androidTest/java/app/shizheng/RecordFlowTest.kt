@@ -1,6 +1,8 @@
 package app.shizheng
 
 import android.app.Application
+import android.graphics.Bitmap
+import android.graphics.Color
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -225,6 +227,46 @@ class RecordFlowTest {
             assertEquals("大二上", data.termName(saved.termId))
         } finally {
             config.write(previous)
+        }
+    }
+
+    @Test fun evidenceManagementReturnsToItsEntryScreenAndProtectsUnsavedChanges() {
+        val state = render()
+        val draft = RecordDraft(title = "证明管理返回测试", category = Category.COMPETITION.name)
+        val store = state.repository.evidence
+        val source = store.cameraFile()
+        try {
+            val bitmap = Bitmap.createBitmap(12, 12, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.YELLOW) }
+            source.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 95, it) }
+            bitmap.recycle()
+            kotlinx.coroutines.runBlocking {
+                val photo = store.import(draft.id, store.uri(source), 0)
+                state.repository.save(draft.copy(files = listOf(photo)))
+            }
+            click(draft.title)
+            click("管理证明")
+            clickDescription("返回")
+            waitFor("记录详情")
+            ui.onNodeWithText("管理证明").assertExists()
+
+            click("管理证明")
+            ui.onNode(hasSetTextAction() and hasText("备注（选填）")).performTextInput("临时备注")
+            clickDescription("返回")
+            waitFor("放弃未保存修改？")
+            click("继续编辑")
+            ui.onNodeWithText("临时备注").assertExists()
+            clickDescription("返回")
+            click("放弃修改")
+            waitFor("记录详情")
+            assertEquals("", state.data.value.records.single { it.id == draft.id }.notes)
+
+            click("编辑记录")
+            click("补充信息与证明（可选）")
+            clickDescription("返回")
+            ui.onNodeWithText("编辑记录").assertExists()
+        } finally {
+            source.delete()
+            kotlinx.coroutines.runBlocking { state.repository.deleteRecords(setOf(draft.id)) }
         }
     }
 
