@@ -1,5 +1,19 @@
 # 拾证版本索引
 
+## v0.3.1 · 2026-11-25
+
+| 项目 | 值 |
+| --- | --- |
+| 构建提交 | `e64e8781b2da295ff11ec76663895e37a156def1`，与 APK 中嵌入的 Git 信息一致 |
+| Git 标签 | `v0.3.1`，包含交付文档 |
+| 私测 APK | `releases/v0.3.1/shizheng-0.3.1.apk` |
+| APK SHA-256 | `b0f8cbc46ae19ecf5c25ff552741c0d9e5d9c4f306e13e1b7783ac7f641119f4` |
+| 应用信息 | `app.shizheng`，版本 `0.3.1`（版本码 4），Android 9 及以上 |
+| 签名 | 沿用分发签名，RSA 3072，APK Signature Scheme v3 |
+| 本地归档 | `releases/v0.3.1/shizheng-v0.3.1.bundle`、`SHA256SUMS.txt`、`verification/` |
+
+支持覆盖安装 0.3.0。沿用 Room 2、完整备份格式 2 和 ZIP 记录导出格式。私测 APK 含共享 DeepSeek 凭据，仅用于受控分发。 [测试报告](TEST_REPORT.md)
+
 ## v0.3.0 · 2026-11-25
 
 | 项目 | 值 |
@@ -76,5 +90,5 @@ try {
     [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($shizhengPointer)
     $shizhengSecret.Dispose()
 }
-.\scripts\Sign-Release.ps1 -InputApk app/build/outputs/apk/release/app-release-unsigned.apk -OutputApk releases/rebuild/shizheng-0.3.0.apk -AndroidSdk $env:ANDROID_HOME
+.\scripts\Sign-Release.ps1 -InputApk app/build/outputs/apk/release/app-release-unsigned.apk -OutputApk releases/rebuild/shizheng-0.3.1.apk -AndroidSdk $env:ANDROID_HOME
 ```
