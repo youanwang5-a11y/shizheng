@@ -42,6 +42,7 @@ internal class AppState @JvmOverloads constructor(
     val repository = RecordRepository(app)
     val data = repository.data
     private val aiStore = AiConfigStore(app)
+    private val welcomePreferences = app.getSharedPreferences("welcome", Application.MODE_PRIVATE)
     var configuration by mutableStateOf(AiConfig.builtInDefault())
         private set
     var configDraft by mutableStateOf(AiConfig())
@@ -60,6 +61,8 @@ internal class AppState @JvmOverloads constructor(
 
     var screen by mutableStateOf(Screen.RECORDS)
     var ready by mutableStateOf(false)
+        private set
+    var showWelcome by mutableStateOf(false)
         private set
     var failedToLoad by mutableStateOf(false)
         private set
@@ -94,6 +97,10 @@ internal class AppState @JvmOverloads constructor(
 
     fun load() = operation("无法读取本地记录。") {
         failedToLoad = true
+        showWelcome = withContext(Dispatchers.IO) {
+            if (!welcomePreferences.contains("completed")) persistWelcome(repository.hasLocalDatabase())
+            !welcomePreferences.getBoolean("completed", false)
+        }
         repository.initialize()
         ready = true
         failedToLoad = false
@@ -102,6 +109,20 @@ internal class AppState @JvmOverloads constructor(
         } catch (_: Exception) {
             message = "无法读取原 AI 凭据。可以在 AI 设置中重新保存。"
         }
+    }
+
+    fun completeWelcome(termId: String?) = operation("无法保存初始设置，请重试。") {
+        if (!showWelcome) return@operation
+        if (termId != null) {
+            val term = data.value.terms.first { it.id == termId }
+            repository.saveTerm(term.copy(current = true))
+        }
+        withContext(Dispatchers.IO) { persistWelcome(completed = true) }
+        showWelcome = false
+    }
+
+    private fun persistWelcome(completed: Boolean) {
+        check(welcomePreferences.edit().putBoolean("completed", completed).commit())
     }
 
     fun openRecord(id: String, returnTo: Screen = Screen.RECORDS) {

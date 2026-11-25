@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
@@ -23,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import app.shizheng.data.Evidence
 import app.shizheng.data.EvidenceKind
+import app.shizheng.data.Snapshot
 import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -183,6 +185,7 @@ internal fun ShizhengApp(state: AppState) {
         "放弃 AI 设置修改？", "本次配置尚未保存。", "放弃修改", { leaveSettings = false },
         { leaveSettings = false; state.screen = state.settingsReturn }, "继续编辑"
     )
+    if (state.ready && state.showWelcome) WelcomeDialog(data, state.busy, state::completeWelcome)
     if (state.busy) Dialog(onDismissRequest = {}) {
         Surface(shape = MaterialTheme.shapes.large) {
             Row(Modifier.padding(22.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -191,6 +194,24 @@ internal fun ShizhengApp(state: AppState) {
             }
         }
     }
+}
+
+@Composable
+private fun WelcomeDialog(data: Snapshot, busy: Boolean, complete: (String?) -> Unit) {
+    var termId by rememberSaveable { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = {},
+        title = { Text("欢迎使用拾证") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("选一个默认学期，新增记录时会自动选中。以后可以在「我的 → 学期管理」修改。")
+                Choice("默认学期", termId?.let(data::termName) ?: "请选择",
+                    data.terms.map { it.id to it.name }) { termId = it }
+            }
+        },
+        confirmButton = { TextButton({ complete(termId) }, enabled = !busy && termId != null) { Text("开始使用") } },
+        dismissButton = { TextButton({ complete(null) }, enabled = !busy) { Text("暂不设置") } }
+    )
 }
 
 private fun launchPicker(state: AppState, launch: () -> Unit) {

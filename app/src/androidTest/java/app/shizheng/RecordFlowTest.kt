@@ -30,6 +30,41 @@ class RecordFlowTest {
     private val instrument = InstrumentationRegistry.getInstrumentation()
     private val app get() = instrument.targetContext.applicationContext as Application
 
+    @Test fun welcomeSetsDefaultTermAndStaysDismissedAfterNewAppState() {
+        val preferences = app.getSharedPreferences("welcome", Application.MODE_PRIVATE)
+        val previous = preferences.all["completed"] as? Boolean
+        lateinit var state: AppState
+        assertTrue(preferences.edit().putBoolean("completed", false).commit())
+        val shown = androidx.compose.runtime.mutableStateOf<AppState?>(null)
+        ui.setContent { shown.value?.let { ShizhengTheme { ShizhengApp(it) } } }
+        try {
+            ui.runOnUiThread { state = AppState(app); shown.value = state }
+            waitFor("欢迎使用拾证")
+            val previousTerm = state.data.value.terms.firstOrNull { it.current }
+            try {
+                click("默认学期")
+                click("大三下")
+                click("开始使用")
+                ui.waitUntil(12_000) { !state.showWelcome }
+                ui.runOnUiThread { shown.value = AppState(app) }
+                ui.waitUntil(12_000) { shown.value?.ready == true }
+                ui.onNodeWithText("欢迎使用拾证").assertDoesNotExist()
+                clickDescription("新增记录")
+                val reopened = requireNotNull(shown.value)
+                assertEquals("大三下", reopened.data.value.termName(reopened.draft?.termId))
+            } finally {
+                kotlinx.coroutines.runBlocking {
+                    if (previousTerm == null) state.repository.clearCurrentTerm()
+                    else state.repository.saveTerm(previousTerm)
+                }
+            }
+        } finally {
+            val edit = preferences.edit()
+            if (previous == null) edit.remove("completed") else edit.putBoolean("completed", previous)
+            assertTrue(edit.commit())
+        }
+    }
+
     @Test fun storesUnprovenRecordThenFindsItAndUsesIndependentAiEntries() {
         val config = AiConfigStore(app)
         val previous = config.read()
@@ -141,7 +176,11 @@ class RecordFlowTest {
         lateinit var state: AppState
         ui.runOnUiThread { state = AppState(app, client) }
         ui.setContent { ShizhengTheme { ShizhengApp(state) } }
-        ui.waitUntil(12_000) { ui.onAllNodesWithContentDescription("新增记录").fetchSemanticsNodes().isNotEmpty() }
+        ui.waitUntil(12_000) { state.ready && !state.busy }
+        if (state.showWelcome) {
+            click("暂不设置")
+            ui.waitUntil(12_000) { !state.showWelcome }
+        }
         return state
     }
 

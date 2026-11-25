@@ -16,7 +16,8 @@ import java.io.IOException
 
 class RecordRepository(context: Context) {
     private val app = context.applicationContext
-    private val db = Room.databaseBuilder(app, AppDatabase::class.java, "shizheng.db")
+    private val databaseName = "shizheng.db"
+    private val db = Room.databaseBuilder(app, AppDatabase::class.java, databaseName)
         .addMigrations(AppDatabase.MIGRATION_1_2).build()
     private val dao = db.records()
     private val mutex = Mutex()
@@ -25,6 +26,8 @@ class RecordRepository(context: Context) {
     val evidence = EvidenceStore(app)
     private val backup = BackupArchive(::checkEvidenceFile)
     private val restoreDirectory = File(app.filesDir, "restore-work")
+
+    internal fun hasLocalDatabase() = app.getDatabasePath(databaseName).exists()
 
     suspend fun initialize() = locked {
         db.withTransaction {
