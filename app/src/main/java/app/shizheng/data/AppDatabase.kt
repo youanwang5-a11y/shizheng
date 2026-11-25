@@ -87,7 +87,9 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL(
                     """
                     INSERT INTO categories (id, name, active)
-                    SELECT ?, ?, 1 WHERE NOT EXISTS (SELECT 1 FROM categories WHERE id = ? OR name = ?)
+                    SELECT ?, ?, 1
+                    WHERE EXISTS (SELECT 1 FROM categories)
+                      AND NOT EXISTS (SELECT 1 FROM categories WHERE id = ? OR name = ?)
                     """.trimIndent(),
                     arrayOf(academic.id, academic.label, academic.id, academic.label)
                 )

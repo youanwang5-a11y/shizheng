@@ -55,7 +55,7 @@ class RoomMigrationTest {
         withMigratedDatabase(2, seed = { db ->
             for (category in oldCategories) {
                 db.execSQL("INSERT INTO categories VALUES (?, ?, ?)",
-                    arrayOf(category.id, category.name, if (category.active) 1 else 0))
+                    arrayOf<Any>(category.id, category.name, if (category.active) 1 else 0))
             }
             db.execSQL("INSERT INTO records VALUES (?, '旧培训', 'TRAINING', NULL, '', NULL, NULL, 0, '', '', '')",
                 arrayOf(record))
@@ -69,6 +69,12 @@ class RoomMigrationTest {
             val saved = dao.records().single()
             assertEquals(record, saved.id)
             assertEquals(RecordCategory(Category.TRAINING.id, "培训", active = false), categories[saved.category])
+        }
+    }
+
+    @Test fun leavesUninitializedVersionTwoCategoriesReadyForDefaultSeeding() = runBlocking {
+        withMigratedDatabase(2, seed = {}) { dao ->
+            assertTrue(dao.categories().isEmpty())
         }
     }
 
