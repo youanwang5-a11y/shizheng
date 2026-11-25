@@ -212,10 +212,12 @@ internal fun ShizhengApp(state: AppState) {
     ) { padding ->
         // Keep the floating controls over the list. Their measured height is its scroll-end padding.
         val direction = LocalLayoutDirection.current
+        val safeBottom = if (floatingRecords) WindowInsets.safeDrawing.asPaddingValues().calculateBottomPadding() else 0.dp
         val bodyPadding = if (floatingRecords) PaddingValues(
             start = padding.calculateStartPadding(direction),
             top = padding.calculateTopPadding(),
-            end = padding.calculateEndPadding(direction)
+            end = padding.calculateEndPadding(direction),
+            bottom = safeBottom
         ) else padding
         Box(Modifier.fillMaxSize().padding(bodyPadding).consumeWindowInsets(padding)) {
             if (!state.ready) {
@@ -227,7 +229,7 @@ internal fun ShizhengApp(state: AppState) {
                 Screen.RECORDS -> RecordList(
                     state, data, results, recordScroll,
                     modifier = if (floatingRecords) Modifier.nestedScroll(recordNavigationScroll) else Modifier,
-                    bottomClearance = if (floatingRecords) padding.calculateBottomPadding() else 0.dp
+                    bottomClearance = if (floatingRecords) (padding.calculateBottomPadding() - safeBottom).coerceAtLeast(0.dp) else 0.dp
                 )
                 Screen.MINE -> Mine(state, data)
                 Screen.DETAIL -> data.records.firstOrNull { it.id == state.recordId }?.let { RecordDetail(state, data, it) }
