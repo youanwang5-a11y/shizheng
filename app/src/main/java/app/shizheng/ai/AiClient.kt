@@ -118,7 +118,7 @@ class AiClient(
         }.orEmpty()
         return RecordDraft(
             title = supported(fields.title, TITLE_LIMIT),
-            category = Category.entries.firstOrNull { it.label == fields.category },
+            category = Category.entries.firstOrNull { it.label == fields.category }?.name,
             level = Level.entries.firstOrNull { it.label == fields.level && source.contains(it.label) },
             start = start, end = end, ranged = ranged,
             organization = supported(fields.organization, TEXT_LIMIT), result = supported(fields.result, TEXT_LIMIT),

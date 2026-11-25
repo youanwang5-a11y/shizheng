@@ -2,14 +2,17 @@ package app.shizheng.ui
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.shizheng.data.Snapshot
+import app.shizheng.data.CATEGORY_LIMIT
+import app.shizheng.data.RecordCategory
 import app.shizheng.data.TERM_LIMIT
 import app.shizheng.data.Term
+import app.shizheng.data.defaultTerms
 import app.shizheng.data.newId
 
 @Composable
@@ -24,9 +27,10 @@ internal fun Mine(state: AppState, data: Snapshot) {
                 Count("已归档", archived)
             }
         }
-        MenuItem("学期管理", data.terms.firstOrNull(Term::current)?.let { "当前学期 · ${it.name}" } ?: "按日期范围整理经历") {
+        MenuItem("学期管理", data.currentTermId?.let { "当前学期 · ${data.termName(it)}" } ?: "设置新增记录的默认学期") {
             state.screen = Screen.TERMS
         }
+        MenuItem("类别管理", "添加或删除记录类别", state::openCategories)
         MenuItem("备份与恢复", "保存或迁移记录和原始证明") { state.screen = Screen.BACKUP }
         MenuItem("AI 记录", "从经历文字生成可编辑草稿") { state.screen = Screen.AI }
         MenuItem("AI 设置", if (state.configuration.isReady) "已启用 · ${state.configuration.model}" else "开关、接口与模型") {
@@ -48,20 +52,20 @@ private fun Count(title: String, value: Int) {
 @Composable
 internal fun Terms(state: AppState, data: Snapshot) {
     Page {
-        Help("经历的完整日期落在一个学期内时自动归入。也可以为单条记录手动选学期。")
-        Button({
-            state.termDraft = Term(newId(), "", "", "", data.terms.isEmpty())
-            state.screen = Screen.TERM
-        }, Modifier.fillMaxWidth()) { Text("新增学期") }
-        if (data.terms.isEmpty()) Panel { Heading("还没有学期") }
-        for (term in data.terms) Panel {
-            Heading(term.name)
-            Help("${term.start} 至 ${term.end}")
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.Center) {
-                OutlinedButton({ state.termDraft = term; state.screen = Screen.TERM }) { Text("编辑学期") }
-                if (term.current) Text("当前学期", Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.primary)
-                else TextButton({ state.setCurrent(term) }) { Text("设为当前学期") }
+        Panel {
+            Choice("当前学期", data.termName(data.currentTermId),
+                listOf(null to "未归入学期") + data.terms.map { it.id to it.name }) { id ->
+                val term = data.terms.firstOrNull { it.id == id }
+                if (term == null) state.clearCurrent() else state.setCurrent(term)
             }
+            Help("新增记录默认选择当前学期。每条记录都可以单独修改。")
+        }
+        Button({
+            state.termDraft = Term(newId(), "", "", "", false)
+            state.screen = Screen.TERM
+        }, Modifier.fillMaxWidth()) { Text("新增自定义学期") }
+        for (term in data.terms.filter { term -> defaultTerms.none { it.name == term.name } }) {
+            MenuItem(term.name, "编辑自定义学期") { state.termDraft = term; state.screen = Screen.TERM }
         }
     }
 }
@@ -70,8 +74,6 @@ internal fun Terms(state: AppState, data: Snapshot) {
 internal fun TermEdit(state: AppState, term: Term) {
     Page {
         Field(term.name, "学期名称", TERM_LIMIT) { state.termDraft = term.copy(name = it) }
-        DayField("开始日期", term.start) { state.termDraft = term.copy(start = it) }
-        DayField("结束日期", term.end, term.start) { state.termDraft = term.copy(end = it) }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("设为当前学期", Modifier.weight(1f))
             Switch(term.current, { state.termDraft = term.copy(current = it) })
@@ -81,16 +83,44 @@ internal fun TermEdit(state: AppState, term: Term) {
 }
 
 @Composable
+internal fun Categories(state: AppState, data: Snapshot) {
+    var name by remember { mutableStateOf("") }
+    var remove by remember { mutableStateOf<RecordCategory?>(null) }
+    Page {
+        Panel {
+            Field(name, "新类别名称", CATEGORY_LIMIT) { name = it }
+            Button({ state.addCategory(name) { name = "" } }, Modifier.fillMaxWidth(), enabled = name.isNotBlank()) {
+                Text("添加类别")
+            }
+        }
+        val active = data.categories.filter(RecordCategory::active)
+        if (active.isEmpty()) Help("添加类别后即可用于新记录。")
+        for (category in active) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(category.name, Modifier.weight(1f))
+                TextButton({ remove = category }) { Text("删除") }
+            }
+        }
+    }
+    remove?.let { category ->
+        Confirm(
+            "删除「${category.name}」？", "已有记录会保留该类别，新记录将无法选择它。", "删除类别",
+            { remove = null }, { remove = null; state.deleteCategory(category.id) }
+        )
+    }
+}
+
+@Composable
 internal fun BackupScreen(state: AppState, create: () -> Unit, select: () -> Unit) {
     Page {
         Panel {
             Heading("创建完整备份")
-            Help("备份包含记录、学期和证明原件。请选择保存位置并妥善保管，备份可以直接读取。")
+            Help("备份包含记录、学期、类别和证明原件。请选择保存位置并妥善保管，备份可以直接读取。")
             Button(create, Modifier.fillMaxWidth()) { Text("保存备份") }
         }
         Panel {
             Heading("从备份恢复")
-            Help("选择拾证备份，验证后可预览数量。确认恢复会替换手机里的记录、学期和证明。")
+            Help("选择拾证备份，验证后可预览数量。确认恢复会替换手机里的记录、学期、类别和证明。")
             OutlinedButton(select, Modifier.fillMaxWidth()) { Text("选择备份文件") }
         }
     }

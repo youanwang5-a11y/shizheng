@@ -16,7 +16,8 @@ import java.io.IOException
 
 class RecordRepository(context: Context) {
     private val app = context.applicationContext
-    private val db = Room.databaseBuilder(app, AppDatabase::class.java, "shizheng.db").build()
+    private val db = Room.databaseBuilder(app, AppDatabase::class.java, "shizheng.db")
+        .addMigrations(AppDatabase.MIGRATION_1_2).build()
     private val dao = db.records()
     private val mutex = Mutex()
     private val mutableData = MutableStateFlow(Snapshot())
@@ -26,6 +27,10 @@ class RecordRepository(context: Context) {
     private val restoreDirectory = File(app.filesDir, "restore-work")
 
     suspend fun initialize() = locked {
+        db.withTransaction {
+            if (dao.categories().isEmpty()) dao.insertCategories(defaultCategories)
+            dao.insertTerms(dao.terms().missingDefaultTerms())
+        }
         refresh()
         evidence.clearUnreferenced(data.value.evidence)
         restoreDirectory.deleteRecursively()
@@ -34,7 +39,7 @@ class RecordRepository(context: Context) {
 
     suspend fun save(draft: RecordDraft): String = locked {
         val current = data.value
-        val record = draft.toRecord(current.terms)
+        val record = draft.toRecord(current.terms, current.categories, current.records.firstOrNull { it.id == draft.id }?.category)
         val previous = current.filesFor(record.id)
         val arranged = draft.files.mapIndexed { i, item ->
             if (item.recordId != record.id || !evidence.file(item).isFile) throw UserError("有附件已不可读，请重新导入。")
@@ -68,21 +73,43 @@ class RecordRepository(context: Context) {
     }
 
     suspend fun saveTerm(term: Term) = locked {
-        val start = parseDate(term.start) ?: throw UserError("请选择学期开始日期。")
-        val end = parseDate(term.end) ?: throw UserError("请选择学期结束日期。")
-        if (term.name.isBlank()) throw UserError("请填写学期名称。")
-        if (end < start) throw UserError("学期结束日期不能早于开始日期。")
+        val name = term.name.trim()
+        if (name.isBlank() || name.length > TERM_LIMIT) throw UserError("请填写有效的学期名称。")
+        val terms = data.value.terms
+        if (terms.none { it.id == term.id && it.name == name } && terms.any { it.name == name }) {
+            throw UserError("该学期已存在。")
+        }
         db.withTransaction {
             if (term.current) dao.clearCurrent()
-            dao.saveTerm(term.copy(name = term.name.trim()))
-            val updatedTerms = dao.terms()
-            dao.records().filterNot(Record::manualTerm).forEach { record ->
-                val from = requireNotNull(parseDate(record.start))
-                val to = record.end?.let { requireNotNull(parseDate(it)) } ?: from
-                val match = termFor(updatedTerms, from, to)
-                if (match != record.termId) dao.saveRecord(record.copy(termId = match))
-            }
+            dao.saveTerm(term.copy(name = name))
         }
+        refresh()
+    }
+
+    suspend fun clearCurrentTerm() = locked {
+        dao.clearCurrent()
+        refresh()
+    }
+
+    suspend fun addCategory(input: String): String = locked {
+        val name = input.trim()
+        if (name.isBlank() || name.length > CATEGORY_LIMIT || name.any(Char::isISOControl)) {
+            throw UserError("请填写有效的类别名称。")
+        }
+        if (data.value.categories.any { it.active && it.name.equals(name, ignoreCase = true) }) {
+            throw UserError("该类别已存在。")
+        }
+        val existing = data.value.categories.firstOrNull { !it.active && it.name.equals(name, ignoreCase = true) }
+        val category = existing?.copy(active = true) ?: RecordCategory(newId(), name)
+        db.withTransaction {
+            if (existing != null) dao.activateCategory(category.id) else dao.insertCategories(listOf(category))
+        }
+        refresh()
+        category.id
+    }
+
+    suspend fun deleteCategory(id: String) = locked {
+        dao.deactivateCategory(id)
         refresh()
     }
 
@@ -118,7 +145,9 @@ class RecordRepository(context: Context) {
             db.withTransaction {
                 dao.clearRecords()
                 dao.clearTerms()
-                dao.insertTerms(incoming.terms)
+                dao.clearCategories()
+                dao.insertTerms(incoming.terms + incoming.terms.missingDefaultTerms())
+                dao.insertCategories(incoming.categories)
                 dao.insertRecords(incoming.records)
                 dao.insertEvidence(transferred)
             }
@@ -133,7 +162,9 @@ class RecordRepository(context: Context) {
     }
 
     private suspend fun refresh() {
-        mutableData.value = Snapshot(dao.terms(), dao.records(), dao.evidence())
+        val order = defaultTerms.map(Term::name)
+        val terms = dao.terms().sortedBy { order.indexOf(it.name).takeIf { index -> index >= 0 } ?: Int.MAX_VALUE }
+        mutableData.value = Snapshot(terms, dao.records(), dao.evidence(), dao.categories())
     }
 
     private suspend fun <T> locked(action: suspend () -> T): T = withContext(Dispatchers.IO) {

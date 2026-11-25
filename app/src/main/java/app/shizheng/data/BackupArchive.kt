@@ -75,9 +75,11 @@ class BackupArchive(private val validateContent: (File, EvidenceKind) -> Unit) {
                 val tree = json.parseToJsonElement(manifestBytes.toString("UTF-8")).jsonObject
                 if (tree["format"]?.jsonPrimitive?.content != FORMAT) invalid()
                 val version = tree["version"]?.jsonPrimitive?.intOrNull ?: invalid()
-                if (version != VERSION) throw UserError("这个备份格式版本暂不支持。")
+                if (version !in 1..VERSION) throw UserError("这个备份格式版本暂不支持。")
+                val snapshot = tree["data"]?.jsonObject ?: invalid()
+                if ((version == 1) == ("categories" in snapshot)) invalid()
                 val data = json.decodeFromJsonElement<BackupManifest>(tree).data
-                validate(data)
+                validate(data, legacy = version == 1)
                 if (entries.keys != data.evidence.mapTo(hashSetOf(), ::entryName)) invalid()
                 for (item in data.evidence) {
                     val entry = entries.getValue(entryName(item))
@@ -124,24 +126,37 @@ class BackupArchive(private val validateContent: (File, EvidenceKind) -> Unit) {
         count
     }
 
-    private fun validate(data: Snapshot) {
+    private fun validate(data: Snapshot, legacy: Boolean = false) {
         if (data.terms.size > LIST_LIMIT || data.records.size > LIST_LIMIT || data.evidence.size > LIST_LIMIT) invalid()
+        if (data.categories.size !in 1..LIST_LIMIT) invalid()
+        val categories = hashSetOf<String>()
+        val activeNames = hashSetOf<String>()
+        for (category in data.categories) {
+            if ((!validId(category.id) && defaultCategories.none { it.id == category.id }) ||
+                !categories.add(category.id) || category.name != category.name.trim() ||
+                category.name.isBlank() || category.name.length > CATEGORY_LIMIT || category.name.any(Char::isISOControl) ||
+                (category.active && !activeNames.add(category.name.lowercase()))
+            ) invalid()
+        }
         if (data.terms.count(Term::current) > 1) invalid()
         val terms = hashSetOf<String>()
         for (term in data.terms) {
-            val start = parseDate(term.start) ?: invalid()
-            val end = parseDate(term.end) ?: invalid()
+            val hasDates = legacy || term.start.isNotEmpty() || term.end.isNotEmpty()
+            val start = if (hasDates) parseDate(term.start) ?: invalid() else null
+            val end = if (hasDates) parseDate(term.end) ?: invalid() else null
             if (!validId(term.id) || !terms.add(term.id) || term.name.isBlank() ||
-                term.name.length > TERM_LIMIT || end < start
+                term.name.length > TERM_LIMIT || (start != null && end != null && end < start)
             ) {
                 invalid()
             }
         }
         val records = hashSetOf<String>()
         for (record in data.records) {
-            val start = parseDate(record.start) ?: invalid()
-            val end = record.end?.let { parseDate(it) ?: invalid() } ?: start
-            if (!validId(record.id) || !records.add(record.id) || end < start ||
+            val hasDates = legacy || record.start.isNotEmpty() || record.end != null
+            val start = if (hasDates) parseDate(record.start) ?: invalid() else null
+            val end = record.end?.let { parseDate(it) ?: invalid() }
+            if (!validId(record.id) || !records.add(record.id) || record.category !in categories ||
+                (start != null && end != null && end < start) ||
                 record.title.isBlank() || record.title.length > TITLE_LIMIT ||
                 listOf(record.organization, record.notes, record.result).any { it.length > TEXT_LIMIT } ||
                 (record.termId != null && record.termId !in terms)
@@ -172,7 +187,7 @@ class BackupArchive(private val validateContent: (File, EvidenceKind) -> Unit) {
 
     companion object {
         private const val FORMAT = "app.shizheng.backup"
-        private const val VERSION = 1
+        private const val VERSION = 2
         private const val MANIFEST = "manifest.json"
         private const val MANIFEST_LIMIT = 8L * 1024 * 1024
         private const val TOTAL_LIMIT = 1024L * 1024 * 1024

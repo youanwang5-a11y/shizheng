@@ -29,7 +29,7 @@ import java.io.File
 internal enum class Screen(val title: String) {
     RECORDS("拾证"), MINE("我的"), DETAIL("记录详情"), EDITOR("录入记录"),
     EXTRAS("补充信息与证明"), PREVIEW("证明预览"), TERMS("学期管理"), TERM("编辑学期"),
-    BACKUP("备份与恢复"), AI("AI 记录"), AI_SETTINGS("AI 设置"), ABOUT("关于应用")
+    BACKUP("备份与恢复"), AI("AI 记录"), AI_SETTINGS("AI 设置"), CATEGORIES("类别管理"), ABOUT("关于应用")
 }
 
 internal class AppState @JvmOverloads constructor(app: Application, private val aiClient: AiClient = AiClient()) : AndroidViewModel(app) {
@@ -74,6 +74,8 @@ internal class AppState @JvmOverloads constructor(app: Application, private val 
         private set
     private var previewReturn = Screen.DETAIL
     var termDraft by mutableStateOf<Term?>(null)
+    var categoriesReturn by mutableStateOf(Screen.MINE)
+        private set
     var prepared by mutableStateOf<PreparedBackup?>(null)
         private set
     var captureFile: File? = null
@@ -101,7 +103,8 @@ internal class AppState @JvmOverloads constructor(app: Application, private val 
     }
 
     fun editRecord(record: Record? = null, extras: Boolean = false) {
-        val initial = record?.let { RecordDraft.from(it, data.value.filesFor(it.id)) } ?: RecordDraft()
+        val initial = record?.let { RecordDraft.from(it, data.value.filesFor(it.id)) }
+            ?: RecordDraft(termId = data.value.currentTermId)
         setEditor(initial, if (record == null) Screen.RECORDS else Screen.DETAIL)
         if (extras) screen = Screen.EXTRAS
     }
@@ -257,6 +260,30 @@ internal class AppState @JvmOverloads constructor(app: Application, private val 
         message = "已设为当前学期"
     }
 
+    fun clearCurrent() = operation("无法清除当前学期。") {
+        repository.clearCurrentTerm()
+        message = "新记录默认未归入学期"
+    }
+
+    fun openCategories() {
+        categoriesReturn = screen
+        screen = Screen.CATEGORIES
+    }
+
+    fun addCategory(name: String, onAdded: () -> Unit) = operation("无法添加类别。") {
+        val id = repository.addCategory(name)
+        if (categoriesReturn == Screen.EDITOR) updateDraft { it.copy(category = id) }
+        onAdded()
+        message = "类别已添加"
+    }
+
+    fun deleteCategory(id: String) = operation("无法删除类别。") {
+        repository.deleteCategory(id)
+        if (filter.category == id) filter = filter.copy(category = null)
+        if (original?.category != id) updateDraft { if (it.category == id) it.copy(category = null) else it }
+        message = "类别已删除"
+    }
+
     fun backup(uri: Uri) = operation("备份失败，请检查目标位置及剩余空间。") {
         repository.backupTo(uri)
         message = "备份已保存"
@@ -313,7 +340,7 @@ internal class AppState @JvmOverloads constructor(app: Application, private val 
 
     fun generateDraft() {
         val content = aiText
-        runAi { setEditor(aiClient.generate(configuration, content), Screen.AI) }
+        runAi { setEditor(aiClient.generate(configuration, content).copy(termId = data.value.currentTermId), Screen.AI) }
     }
 
     fun cancelAi() { aiJob?.cancel() }

@@ -54,7 +54,7 @@ class AiClientTest {
         val source = "2026年11月24日，参加图书馆志愿活动，组织单位图书馆，服务8小时。"
         val draft = AiClient(transport).generate(settings, source)
         assertEquals("图书馆志愿活动", draft.title)
-        assertEquals(Category.VOLUNTEER, draft.category)
+        assertEquals(Category.VOLUNTEER.name, draft.category)
         assertEquals("2026-11-24", draft.start)
         assertEquals("服务8小时", draft.result)
         assertEquals("图书馆", draft.organization)

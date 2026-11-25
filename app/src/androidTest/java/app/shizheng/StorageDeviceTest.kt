@@ -26,7 +26,7 @@ class StorageDeviceTest {
         val baseline = repository.data.value
         val term = Term(newId(), "设备测试学期", "2026-09-01", "2027-01-31", true)
         repository.saveTerm(term)
-        val draft = RecordDraft(title = "设备验证记录", category = Category.VOLUNTEER, level = Level.SCHOOL,
+        val draft = RecordDraft(title = "设备验证记录", category = Category.VOLUNTEER.name, level = Level.SCHOOL, termId = term.id,
             start = "2026-11-24", ranged = true, end = "2026-11-25", organization = "实验组", result = "参与", notes = "合成样例")
         repository.save(draft)
         assertTrue(RecordFilter(state = ArchiveState.PENDING).apply(repository.data.value).any { it.id == draft.id })
@@ -39,7 +39,7 @@ class StorageDeviceTest {
         val arranged = listOf(added[2].copy(name = "已核对的说明.docx"), added[0], added[1])
         repository.save(draft.copy(files = arranged, notes = "已编辑备注"))
         assertEquals(added.map { it.kind }, listOf(EvidenceKind.PHOTO, EvidenceKind.PDF, EvidenceKind.DOCX))
-        assertTrue(RecordFilter("实验组", Category.VOLUNTEER, Level.SCHOOL, term.id, ArchiveState.ARCHIVED)
+        assertTrue(RecordFilter("实验组", Category.VOLUNTEER.name, Level.SCHOOL, term.id, ArchiveState.ARCHIVED)
             .apply(repository.data.value).any { it.id == draft.id })
         for (source in sources) assertArrayEquals(original.getValue(source.name), source.readBytes())
         val restarted = RecordRepository(context)
@@ -57,9 +57,14 @@ class StorageDeviceTest {
             assertEquals(2, viewer.pageCount)
             viewer.openPage(1).use { assertTrue(it.width > 0) }
         }
-        val savedWord = File(cameraDir, "另存.docx")
-        restarted.evidence.copyTo(added[2], restarted.evidence.uri(savedWord))
-        assertArrayEquals(original.getValue("说明.docx"), savedWord.readBytes())
+        val exported = added.mapIndexed { index, item ->
+            val (name, mime) = restarted.evidence.exportNameAndType(item.copy(name = "另存"))
+            assertEquals(listOf("image/png", "application/pdf", EvidenceKind.DOCX.mime)[index], mime)
+            val target = File(cameraDir, name)
+            restarted.evidence.copyTo(item, restarted.evidence.uri(target))
+            assertArrayEquals(original.getValue(sources[index].name), target.readBytes())
+            target
+        }
 
         val backup = File(cameraDir, "设备完整备份.zip")
         restarted.backupTo(restarted.evidence.uri(backup))
@@ -88,7 +93,7 @@ class StorageDeviceTest {
         restarted.deleteRecord(draft.id)
         assertFalse(restarted.data.value.records.any { it.id == draft.id })
         assertTrue(restoredFiles.none { restarted.evidence.file(it).exists() })
-        assertArrayEquals(original.getValue("说明.docx"), savedWord.readBytes())
+        assertArrayEquals(original.getValue("说明.docx"), exported.last().readBytes())
         // Any records present before the exercise remain in the debug installation.
         assertEquals(baseline.records.map(Record::id).toSet(), restarted.data.value.records.map(Record::id).toSet())
     }

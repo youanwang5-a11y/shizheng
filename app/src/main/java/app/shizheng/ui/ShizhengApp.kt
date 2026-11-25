@@ -51,6 +51,7 @@ internal fun ShizhengApp(state: AppState) {
                 Screen.EXTRAS -> state.screen = Screen.EDITOR
                 Screen.EDITOR -> if (state.unsaved) leaveEditor = true else state.discardDraft()
                 Screen.TERM -> { state.termDraft = null; state.screen = Screen.TERMS }
+                Screen.CATEGORIES -> state.screen = state.categoriesReturn
                 Screen.AI_SETTINGS -> if (state.aiSettingsDirty) leaveSettings = true else state.screen = state.settingsReturn
                 Screen.TERMS, Screen.BACKUP, Screen.AI, Screen.ABOUT -> state.screen = Screen.MINE
                 else -> Unit
@@ -161,6 +162,7 @@ internal fun ShizhengApp(state: AppState) {
                 Screen.PREVIEW -> state.shownEvidence?.let { EvidencePreview(state, it, exportFile) }
                 Screen.TERMS -> Terms(state, data)
                 Screen.TERM -> state.termDraft?.let { TermEdit(state, it) }
+                Screen.CATEGORIES -> Categories(state, data)
                 Screen.BACKUP -> BackupScreen(state, backup) {
                     launchPicker(state) { selectBackup.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) }
                 }

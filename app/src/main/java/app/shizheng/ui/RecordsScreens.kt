@@ -47,7 +47,7 @@ internal fun RecordList(state: AppState, data: Snapshot) {
                     }
                     TextButton({ showFilters = true }) { Text("筛选") }
                 }
-                val conditions = listOfNotNull(filter.category?.label, filter.level?.label, filter.termId?.let(data::termName))
+                val conditions = listOfNotNull(data.categoryName(filter.category), filter.level?.label, filter.termId?.let(data::termName))
                 if (conditions.isNotEmpty()) Help(conditions.joinToString(" · "))
                 if (results.isNotEmpty()) Help("${results.size} 条记录")
             }
@@ -78,7 +78,7 @@ internal fun RecordList(state: AppState, data: Snapshot) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text(record.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
                             maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        Help(listOfNotNull(record.category.label, record.level?.label, dateLabel(record)).joinToString(" · "))
+                        Help(listOfNotNull(data.categoryName(record.category), record.level?.label, dateLabel(record).takeIf(String::isNotEmpty)).joinToString(" · "))
                         val extra = listOfNotNull(record.organization.takeIf(String::isNotBlank),
                             files.size.takeIf { it > 0 }?.let { "$it 个证明" })
                         if (extra.isNotEmpty()) Text(extra.joinToString(" · "), style = MaterialTheme.typography.bodySmall,
@@ -102,7 +102,9 @@ private fun FilterDialog(filter: RecordFilter, data: Snapshot, dismiss: () -> Un
         onDismissRequest = dismiss, title = { Text("筛选记录") },
         text = {
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Choice("类别", selected.category?.label ?: "不限", listOf(null to "不限") + Category.entries.map { it to it.label }) {
+                val filters = data.categories.filter { it.active || data.records.any { record -> record.category == it.id } }
+                Choice("类别", data.categoryName(selected.category) ?: "不限", listOf(null to "不限") +
+                    filters.map { it.id to if (it.active) it.name else "${it.name}（已删除）" }) {
                     selected = selected.copy(category = it)
                 }
                 Choice("级别", selected.level?.label ?: "不限", listOf(null to "不限") + Level.entries.map { it to it.label }) {
@@ -146,14 +148,16 @@ internal fun EditRecord(state: AppState, data: Snapshot, draft: RecordDraft, ext
                     Help("核对名称、类别、完整日期等信息，再保存为普通记录。")
                 }
                 Field(draft.title, "名称 *", TITLE_LIMIT) { input -> state.updateDraft { it.copy(title = input) } }
-                Choice("类别 *", draft.category?.label ?: "请选择", Category.entries.map { it to it.label }) { category ->
+                Choice("类别 *", data.categoryName(draft.category) ?: "请选择", data.categories
+                    .filter { it.active || it.id == draft.category }.map { it.id to it.name }) { category ->
                     state.updateDraft { it.copy(category = category) }
                 }
+                TextButton(state::openCategories) { Text("管理类别") }
                 Choice("级别（选填）", draft.level?.label ?: "未选择", listOf(null to "未选择") + Level.entries.map { it to it.label }) { level ->
                     state.updateDraft { it.copy(level = level) }
                 }
                 Panel {
-                    Heading("时间 *")
+                    Heading("时间（选填）")
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(!draft.ranged, { state.updateDraft { it.copy(ranged = false) } }, { Text("单日") })
                         FilterChip(draft.ranged, { state.updateDraft { it.copy(ranged = true) } }, { Text("时间段") })
@@ -164,16 +168,13 @@ internal fun EditRecord(state: AppState, data: Snapshot, draft: RecordDraft, ext
                     if (draft.ranged) DayField("结束日期", draft.end, draft.start) { day ->
                         state.updateDraft { it.copy(end = day) }
                     }
+                    if (draft.start.isNotEmpty() || draft.end.isNotEmpty()) {
+                        TextButton({ state.updateDraft { it.copy(start = "", end = "", ranged = false) } }) { Text("清除日期") }
+                    }
                 }
-                val term = draft.shownTerm(data.terms)
-                val termOptions = listOf(AUTOMATIC to "根据日期自动归入", null to "未归入学期") + data.terms.map { it.id to it.name }
-                Choice("学期", data.termName(term), termOptions) { id ->
-                    state.updateDraft { it.copy(manualTerm = id != AUTOMATIC, termId = id.takeUnless { it == AUTOMATIC }) }
-                }
-                when {
-                    data.terms.isEmpty() -> Help("可在「我的 → 学期管理」添加日期范围，已有记录会重新匹配。")
-                    draft.manualTerm -> Help("已手动选择学期。")
-                    term == null && draft.start.isNotBlank() -> Help("日期未匹配到唯一学期，可手动选择。")
+                val termOptions = listOf(null to "未归入学期") + data.terms.map { it.id to it.name }
+                Choice("学期", data.termName(draft.termId), termOptions) { id ->
+                    state.updateDraft { it.copy(termId = id) }
                 }
             }
         }
@@ -186,8 +187,6 @@ internal fun EditRecord(state: AppState, data: Snapshot, draft: RecordDraft, ext
         }
     }
 }
-
-private const val AUTOMATIC = "__auto__"
 
 @Composable
 private fun EditableAttachment(state: AppState, item: Evidence, index: Int, last: Int) {
@@ -229,7 +228,7 @@ internal fun RecordDetail(state: AppState, data: Snapshot, record: Record) {
                 Text(record.title, Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
                 StatusPill(files.isNotEmpty())
             }
-            DetailLine("类别", record.category.label)
+            DetailLine("类别", data.categoryName(record.category).orEmpty())
             DetailLine("级别", record.level?.label.orEmpty())
             DetailLine("时间", dateLabel(record))
             DetailLine("学期", data.termName(record.termId))

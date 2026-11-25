@@ -9,6 +9,10 @@ import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 
 class BackupArchiveTest {
     @get:Rule val temp = TemporaryFolder()
@@ -63,9 +67,26 @@ class BackupArchiveTest {
         }
     }
 
+    @Test fun restoresVersionOneAndRoundTripsUndatedRecordsWithRetiredCategories() {
+        val fixture = prepareFixture()
+        val zip = entries(encoded(fixture))
+        val manifest = Json.parseToJsonElement(zip.getValue("manifest.json").decodeToString()).jsonObject
+        val oldData = JsonObject(manifest.getValue("data").jsonObject - "categories")
+        val oldManifest = JsonObject(manifest + mapOf("version" to JsonPrimitive(1), "data" to oldData))
+        val legacy = zipped(zip + ("manifest.json" to oldManifest.toString().encodeToByteArray()))
+        archive.prepare(legacy.inputStream(), temp.root).use { assertEquals(fixture.first, it.snapshot) }
+
+        val category = RecordCategory(newId(), "历史自定义类别", false)
+        val record = fixture.first.records.single().copy(category = category.id, start = "", end = null)
+        val updated = fixture.first.copy(records = listOf(record), categories = defaultCategories + category)
+        archive.prepare(encoded(updated to fixture.second).inputStream(), temp.root).use {
+            assertEquals(updated, it.snapshot)
+        }
+    }
+
     private fun prepareFixture(): Pair<Snapshot, Map<String, File>> {
         val term = Term(newId(), "秋季学期", "2026-09-01", "2027-01-31", true)
-        val record = RecordDraft(title = "志愿活动", category = Category.VOLUNTEER, start = "2026-11-24",
+        val record = RecordDraft(title = "志愿活动", category = Category.VOLUNTEER.name, start = "2026-11-24", termId = term.id,
             level = Level.SCHOOL, organization = "实践部", result = "服务8小时", notes = "合成用例").toRecord(listOf(term))
         val files = linkedMapOf<String, File>()
         val items = listOf("图片.png" to EvidenceKind.PHOTO, "材料.pdf" to EvidenceKind.PDF, "活动说明.docx" to EvidenceKind.DOCX)

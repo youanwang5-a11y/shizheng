@@ -36,7 +36,7 @@ import java.io.File
 internal data class EvidenceActions(val camera: () -> Unit, val photos: () -> Unit, val files: () -> Unit)
 
 @Composable
-internal fun EvidenceThumbnail(store: EvidenceStore, item: Evidence?, category: Category? = null) {
+internal fun EvidenceThumbnail(store: EvidenceStore, item: Evidence?, category: String? = null) {
     val bitmap by produceState<Bitmap?>(null, item?.id) {
         value = if (item?.kind == EvidenceKind.PHOTO) withContext(Dispatchers.IO) {
             runCatching { decodePhoto(store.file(item), 160) }.getOrNull()
@@ -53,14 +53,14 @@ internal fun EvidenceThumbnail(store: EvidenceStore, item: Evidence?, category: 
             if (kind != null && kind != EvidenceKind.PHOTO) Text(kind.label, style = MaterialTheme.typography.labelMedium)
             else Icon(
                 when (category) {
-                    Category.COMPETITION, Category.HONOR -> Icons.Default.Star
-                    Category.VOLUNTEER -> Icons.Default.Favorite
-                    Category.PRACTICE -> Icons.Default.Place
-                    Category.RESEARCH -> Icons.Default.Search
-                    Category.CULTURE -> Icons.Default.Face
-                    Category.TRAINING -> Icons.Default.Create
+                    Category.COMPETITION.name, Category.HONOR.name -> Icons.Default.Star
+                    Category.VOLUNTEER.name -> Icons.Default.Favorite
+                    Category.PRACTICE.name -> Icons.Default.Place
+                    Category.RESEARCH.name -> Icons.Default.Search
+                    Category.CULTURE.name -> Icons.Default.Face
+                    Category.TRAINING.name -> Icons.Default.Create
                     else -> Icons.AutoMirrored.Filled.List
-                }, contentDescription = category?.label ?: "证明文件", modifier = Modifier.size(22.dp)
+                }, contentDescription = null, modifier = Modifier.size(22.dp)
             )
         }
     }

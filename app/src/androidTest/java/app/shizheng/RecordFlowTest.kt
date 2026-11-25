@@ -5,9 +5,6 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.test.uiautomator.By
-import androidx.test.uiautomator.UiDevice
-import androidx.test.uiautomator.Until
 import app.shizheng.ai.AiClient
 import app.shizheng.ai.AiConfig
 import app.shizheng.ai.AiConfigStore
@@ -38,15 +35,16 @@ class RecordFlowTest {
         config.write(AiConfig())
         try {
             val state = render()
+            click("我的")
+            click("学期管理")
+            click("当前学期")
+            click("大二上")
+            clickDescription("返回")
+            click("记录")
             clickDescription("新增记录")
             ui.onNode(hasSetTextAction() and hasText("名称 *")).performTextInput("设备测试·图书馆志愿服务")
             click("类别 *")
             click("志愿服务")
-            click("选择日期")
-            val device = UiDevice.getInstance(instrument)
-            val accept = device.wait(Until.findObject(By.res("android", "button1")), 5_000)
-            assertNotNull("Date picker positive button", accept)
-            accept!!.click()
             click("保存记录")
             waitFor("添加证明")
             assertTrue(ui.onAllNodesWithText("待补证明").fetchSemanticsNodes().isNotEmpty())
@@ -69,7 +67,10 @@ class RecordFlowTest {
             waitFor("测试连接")
             clickDescription("返回")
             waitFor("数据概况")
-            assertTrue(state.data.value.records.any { it.title == "设备测试·图书馆志愿服务" })
+            val data = state.data.value
+            val saved = data.records.last { it.title == "设备测试·图书馆志愿服务" }
+            assertEquals("", saved.start)
+            assertEquals("大二上", data.termName(saved.termId))
         } finally {
             config.write(previous)
         }

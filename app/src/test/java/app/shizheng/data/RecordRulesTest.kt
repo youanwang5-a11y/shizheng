@@ -6,7 +6,7 @@ import org.junit.Test
 class RecordRulesTest {
     private val autumn = Term(newId(), "上学期", "2026-09-01", "2027-01-31", true)
     private val spring = Term(newId(), "下学期", "2027-02-01", "2027-07-31", false)
-    private val input = RecordDraft(title = " 图书馆志愿服务 ", category = Category.VOLUNTEER, start = "2026-11-18")
+    private val input = RecordDraft(title = " 图书馆志愿服务 ", category = Category.VOLUNTEER.name, start = "2026-11-18")
 
     @Test fun validatesRequiredFieldsAndCalendarDates() {
         assertThrows(UserError::class.java) { input.copy(title = "  ").toRecord(emptyList()) }
@@ -18,26 +18,35 @@ class RecordRulesTest {
         val saved = input.toRecord(emptyList())
         assertEquals("图书馆志愿服务", saved.title)
         assertNull(saved.end)
+        assertEquals("", input.copy(start = "", ranged = true).toRecord(emptyList()).start)
+        assertThrows(UserError::class.java) { input.copy(start = "", end = "2026-11-28", ranged = true).toRecord(emptyList()) }
     }
 
-    @Test fun assignsOnlyUniqueContainingTermWithManualOverride() {
+    @Test fun storesOnlyTheSelectedTermRegardlessOfDate() {
         val terms = listOf(autumn, spring)
-        assertEquals(autumn.id, input.toRecord(terms).termId)
+        assertNull(input.toRecord(terms).termId)
         val crossing = input.copy(ranged = true, end = "2027-02-01")
         assertNull(crossing.toRecord(terms).termId)
-        assertEquals(spring.id, crossing.copy(manualTerm = true, termId = spring.id).toRecord(terms).termId)
-        assertNull(input.toRecord(terms + autumn.copy(id = newId())).termId)
-        assertNull(input.copy(manualTerm = true).toRecord(terms).termId)
-        assertThrows(UserError::class.java) { input.copy(manualTerm = true, termId = newId()).toRecord(terms) }
+        assertEquals(spring.id, crossing.copy(termId = spring.id).toRecord(terms).termId)
+        assertThrows(UserError::class.java) { input.copy(termId = newId()).toRecord(terms) }
+        assertEquals(listOf("大一上", "大一下", "大二上", "大二下"), defaultTerms.take(4).map(Term::name))
+    }
+
+    @Test fun keepsDeletedCategoriesOnExistingRecordsOnly() {
+        val retired = RecordCategory(newId(), "创新项目", false)
+        val draft = input.copy(category = retired.id)
+        val choices = defaultCategories + retired
+        assertThrows(UserError::class.java) { draft.toRecord(emptyList(), choices) }
+        assertEquals(retired.id, draft.toRecord(emptyList(), choices, retired.id).category)
     }
 
     @Test fun intersectsFiltersAndRecomputesArchiveStateAfterLastFileIsRemoved() {
         val terms = listOf(autumn)
-        val record = input.copy(organization = "图书馆", notes = "周三", level = Level.SCHOOL).toRecord(terms)
-        val another = input.copy(id = newId(), title = "数学竞赛", start = "2026-11-20", category = Category.COMPETITION).toRecord(terms)
+        val record = input.copy(organization = "图书馆", notes = "周三", level = Level.SCHOOL, termId = autumn.id).toRecord(terms)
+        val another = input.copy(id = newId(), title = "数学竞赛", start = "2026-11-20", category = Category.COMPETITION.name).toRecord(terms)
         val attachment = Evidence(newId(), record.id, "证明.pdf", EvidenceKind.PDF, 0, 38, "a".repeat(64))
         val archived = Snapshot(terms, listOf(record, another), listOf(attachment))
-        val filter = RecordFilter("周三", Category.VOLUNTEER, Level.SCHOOL, autumn.id, ArchiveState.ARCHIVED)
+        val filter = RecordFilter("周三", Category.VOLUNTEER.name, Level.SCHOOL, autumn.id, ArchiveState.ARCHIVED)
         assertEquals(listOf(record), filter.apply(archived))
         assertEquals(listOf(record), filter.copy(query = "图书馆").apply(archived))
         val pending = archived.copy(evidence = emptyList())
