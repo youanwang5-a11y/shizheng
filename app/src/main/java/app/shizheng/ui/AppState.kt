@@ -1,5 +1,6 @@
 package app.shizheng.ui
 
+import android.annotation.SuppressLint
 import android.app.Application
 import android.net.Uri
 import androidx.compose.runtime.getValue
@@ -125,6 +126,8 @@ internal class AppState @JvmOverloads constructor(
         showWelcome = false
     }
 
+    // The welcome screen closes only after the completion flag is durable.
+    @SuppressLint("UseKtx")
     private fun persistWelcome(completed: Boolean) {
         check(welcomePreferences.edit().putBoolean("completed", completed).commit())
     }

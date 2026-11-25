@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -17,22 +18,23 @@ import app.shizheng.data.defaultTerms
 
 @Composable
 internal fun RecordExportScreen(data: Snapshot, export: (Set<String>) -> Unit) {
-    var terms by rememberSaveable { mutableStateOf(arrayListOf<String>()) }
+    var scope by rememberSaveable(stateSaver = listSaver<Set<String>, String>(
+        save = { it.toList() }, restore = { it.toSet() }
+    )) { mutableStateOf(emptySet()) }
     val termsByName = remember(data.terms) { data.terms.associateBy(Term::name) }
     val academicYears = remember(termsByName) {
         defaultTerms.chunked(2).map { pair ->
-            pair.mapNotNull { termsByName[it.name]?.id } to pair.first().name.removeSuffix("上")
+            pair.mapNotNull { termsByName[it.name]?.id }.toSet() to pair.first().name.removeSuffix("上")
         }.filter { it.first.isNotEmpty() }
     }
     val recordsByTerm = remember(data.records) { data.records.groupBy { it.termId ?: RecordFilter.NO_TERM } }
-    val scope = remember(terms) { terms.toSet() }
     val records = remember(scope, recordsByTerm) { scope.flatMap { recordsByTerm[it].orEmpty() } }
 
     Column(Modifier.fillMaxSize()) {
         Page(Modifier.weight(1f)) {
             Help("选择要导出的学期。ZIP 内含 CSV 记录清单和证明原件。")
-            Choice("快速选择学年", academicYears.firstOrNull { it.first.toSet() == scope }?.second ?: "请选择", academicYears) {
-                terms = ArrayList(it)
+            Choice("快速选择学年", academicYears.firstOrNull { it.first == scope }?.second ?: "请选择", academicYears) {
+                scope = it
             }
             Panel {
                 for ((id, name) in data.terms.map { it.id to it.name } + (RecordFilter.NO_TERM to "未归入学期")) {
@@ -40,7 +42,7 @@ internal fun RecordExportScreen(data: Snapshot, export: (Set<String>) -> Unit) {
                     Row(
                         Modifier.fillMaxWidth().heightIn(min = 48.dp).toggleable(
                             value = selected, role = Role.Checkbox,
-                            onValueChange = { checked -> terms = ArrayList(if (checked) scope + id else scope - id) }
+                            onValueChange = { checked -> scope = if (checked) scope + id else scope - id }
                         ),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically
