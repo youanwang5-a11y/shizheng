@@ -8,6 +8,11 @@ import androidx.test.platform.app.InstrumentationRegistry
 import app.shizheng.ai.AiClient
 import app.shizheng.ai.AiConfig
 import app.shizheng.ai.AiConfigStore
+import app.shizheng.data.Category
+import app.shizheng.data.RecordDraft
+import app.shizheng.data.Snapshot
+import app.shizheng.data.defaultTerms
+import app.shizheng.ui.RecordExportScreen
 import app.shizheng.ui.AppState
 import app.shizheng.ui.ShizhengApp
 import app.shizheng.ui.ShizhengTheme
@@ -63,6 +68,29 @@ class RecordFlowTest {
             if (previous == null) edit.remove("completed") else edit.putBoolean("completed", previous)
             assertTrue(edit.commit())
         }
+    }
+
+    @Test fun exportSelectsBothTermsOfAcademicYearAndAllowsCustomScope() {
+        val terms = defaultTerms
+        val records = listOf(terms[0].id, terms[1].id, terms[2].id, null).mapIndexed { index, id ->
+            RecordDraft(title = "学年测试 $index", category = Category.OTHER.name, termId = id).toRecord(terms)
+        }
+        var exported: Set<String> = emptySet()
+        ui.setContent {
+            ShizhengTheme { RecordExportScreen(Snapshot(terms = terms, records = records)) { exported = it } }
+        }
+        ui.onNodeWithText("导出 0 条记录").assertIsNotEnabled()
+        click("快速选择学年")
+        click("大一")
+        ui.onNodeWithText("大一上").assertIsOn()
+        ui.onNodeWithText("大一下").assertIsOn()
+        ui.onNodeWithText("大二上").assertIsOff()
+        click("导出 2 条记录")
+        assertEquals(records.take(2).map { it.id }.toSet(), exported)
+        click("大一下")
+        click("大二上")
+        click("导出 2 条记录")
+        assertEquals(setOf(records[0].id, records[2].id), exported)
     }
 
     @Test fun storesUnprovenRecordAndKeepsAiEntryInNewRecord() {

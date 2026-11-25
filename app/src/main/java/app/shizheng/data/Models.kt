@@ -197,7 +197,6 @@ fun newId(): String = UUID.randomUUID().toString()
 
 class UserError(message: String) : Exception(message)
 
-// Implementations can project the same snapshot and open original evidence when an export format is chosen.
 interface RecordExporter {
     fun export(data: Snapshot, evidenceFile: (Evidence) -> java.io.File, destination: java.io.OutputStream)
 }

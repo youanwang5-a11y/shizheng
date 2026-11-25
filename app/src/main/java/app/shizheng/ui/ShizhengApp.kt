@@ -55,7 +55,7 @@ internal fun ShizhengApp(state: AppState) {
                 Screen.TERM -> { state.termDraft = null; state.screen = Screen.TERMS }
                 Screen.CATEGORIES -> state.screen = state.categoriesReturn
                 Screen.AI_SETTINGS -> if (state.aiSettingsDirty) leaveSettings = true else state.screen = state.settingsReturn
-                Screen.TERMS, Screen.BACKUP, Screen.ABOUT -> state.screen = Screen.MINE
+                Screen.TERMS, Screen.EXPORT, Screen.BACKUP, Screen.ABOUT -> state.screen = Screen.MINE
                 else -> Unit
             }
         }
@@ -109,6 +109,12 @@ internal fun ShizhengApp(state: AppState) {
     }
     val selectBackup = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { it?.let(state::inspect) }
     val backup: () -> Unit = { launchPicker(state) { createBackup.launch("拾证-${LocalDate.now()}.shizheng.zip") } }
+    val createRecordExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) {
+        state.saveRecordExport(it)
+    }
+    val exportRecords: (Set<String>) -> Unit = { ids ->
+        state.launchRecordExport(ids) { createRecordExport.launch("拾证-记录导出-${LocalDate.now()}.zip") }
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize().imePadding(),
@@ -169,6 +175,7 @@ internal fun ShizhengApp(state: AppState) {
                 Screen.TERMS -> Terms(state, data)
                 Screen.TERM -> state.termDraft?.let { TermEdit(state, it) }
                 Screen.CATEGORIES -> Categories(state, data)
+                Screen.EXPORT -> RecordExportScreen(data, exportRecords)
                 Screen.BACKUP -> BackupScreen(state, backup) {
                     launchPicker(state) { selectBackup.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) }
                 }

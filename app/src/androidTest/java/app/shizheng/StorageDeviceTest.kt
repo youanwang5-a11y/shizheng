@@ -13,6 +13,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 import java.util.zip.ZipEntry
+import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
 
 @RunWith(AndroidJUnit4::class)
@@ -65,6 +66,24 @@ class StorageDeviceTest {
             assertArrayEquals(original.getValue(sources[index].name), target.readBytes())
             target
         }
+
+        val selectedExport = File(cameraDir, "所选记录.zip")
+        assertEquals(1, restarted.exportRecords(restarted.evidence.uri(selectedExport), setOf(draft.id)))
+        ZipFile(selectedExport).use { zip ->
+            val names = zip.entries().toList().map(ZipEntry::getName)
+            assertEquals(listOf("记录清单.csv", "证明附件/1/1-已核对的说明.docx",
+                "证明附件/1/2-照片.png", "证明附件/1/3-材料.pdf"), names)
+            val csv = zip.getInputStream(zip.getEntry(names.first())).bufferedReader().use { it.readText() }
+            assertTrue(csv.startsWith("\uFEFF"))
+            for (value in listOf("设备验证记录", "设备测试学期", "已编辑备注", "证明附件/1")) {
+                assertTrue(csv.contains("\"$value\""))
+            }
+            names.drop(1).zip(listOf(sources[2], sources[0], sources[1])).forEach { (name, source) ->
+                assertArrayEquals(original.getValue(source.name), zip.getInputStream(zip.getEntry(name)).use { it.readBytes() })
+            }
+        }
+        assertTrue(runCatching { restarted.inspectBackup(restarted.evidence.uri(selectedExport)) }.exceptionOrNull() is UserError)
+        assertEquals(before, restarted.data.value)
 
         val backup = File(cameraDir, "设备完整备份.zip")
         restarted.backupTo(restarted.evidence.uri(backup))

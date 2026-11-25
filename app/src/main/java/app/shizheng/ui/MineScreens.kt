@@ -32,6 +32,7 @@ internal fun Mine(state: AppState, data: Snapshot) {
             state.screen = Screen.TERMS
         }
         MenuItem("类别管理", "添加或删除记录类别", state::openCategories)
+        MenuItem("导出记录", "按学年或学期打包清单和证明原件") { state.screen = Screen.EXPORT }
         MenuItem("备份与恢复", "保存或迁移记录和原始证明") { state.screen = Screen.BACKUP }
         val ai = state.aiDestination(state.configuration).getOrNull()
         MenuItem("AI 设置", if (state.configuration.enabled && ai != null) "已启用 · ${ai.model}" else "开关、接口与模型") {

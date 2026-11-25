@@ -13,6 +13,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
+import java.io.OutputStream
 
 class RecordRepository(context: Context) {
     private val app = context.applicationContext
@@ -25,6 +26,7 @@ class RecordRepository(context: Context) {
     val data = mutableData.asStateFlow()
     val evidence = EvidenceStore(app)
     private val backup = BackupArchive(::checkEvidenceFile)
+    private val exporter = ZipRecordExporter { evidence.exportNameAndType(it).first }
     private val restoreDirectory = File(app.filesDir, "restore-work")
 
     internal fun hasLocalDatabase() = app.getDatabasePath(databaseName).exists()
@@ -117,9 +119,23 @@ class RecordRepository(context: Context) {
     }
 
     suspend fun backupTo(uri: Uri) = locked {
-        val temporary = File.createTempFile("backup-", ".zip", app.cacheDir)
+        writeArchiveTo(uri, "backup-") { backup.write(data.value, it, evidence::file) }
+    }
+
+    suspend fun exportRecords(uri: Uri, ids: Set<String>): Int = locked {
+        val current = data.value
+        val records = current.records.filter { it.id in ids }
+        if (records.isEmpty()) throw UserError("请选择要导出的记录。")
+        if (records.size != ids.size) throw UserError("所选记录已有变化，请重新选择。")
+        val selected = current.copy(records = records, evidence = current.evidence.filter { it.recordId in ids })
+        writeArchiveTo(uri, "export-") { exporter.export(selected, evidence::file, it) }
+        records.size
+    }
+
+    private fun writeArchiveTo(uri: Uri, prefix: String, write: (OutputStream) -> Unit) {
+        val temporary = File.createTempFile(prefix, ".zip", app.cacheDir)
         try {
-            temporary.outputStream().use { backup.write(data.value, it, evidence::file) }
+            temporary.outputStream().use(write)
             app.contentResolver.openOutputStream(uri, "wt")?.use { output ->
                 temporary.inputStream().use { it.copyTo(output) }
             } ?: throw UserError("无法写入选中的位置。")

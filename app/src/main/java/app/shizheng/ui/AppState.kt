@@ -32,7 +32,7 @@ import java.io.File
 internal enum class Screen(val title: String) {
     RECORDS("拾证"), MINE("我的"), DETAIL("记录详情"), EDITOR("录入记录"),
     EXTRAS("补充信息与证明"), PREVIEW("证明预览"), TERMS("学期管理"), TERM("编辑学期"),
-    BACKUP("备份与恢复"), AI_SETTINGS("AI 设置"), CATEGORIES("类别管理"), ABOUT("关于应用")
+    EXPORT("导出记录"), BACKUP("备份与恢复"), AI_SETTINGS("AI 设置"), CATEGORIES("类别管理"), ABOUT("关于应用")
 }
 
 internal class AppState @JvmOverloads constructor(
@@ -92,6 +92,7 @@ internal class AppState @JvmOverloads constructor(
     var captureFile: File? = null
     var exportEvidence: Evidence? = null
         private set
+    private var pendingRecordExport: Set<String>? = null
 
     init { load() }
 
@@ -325,6 +326,31 @@ internal class AppState @JvmOverloads constructor(
     fun backup(uri: Uri) = operation("备份失败，请检查目标位置及剩余空间。") {
         repository.backupTo(uri)
         message = "备份已保存"
+    }
+
+    fun launchRecordExport(ids: Set<String>, launch: () -> Unit) {
+        if (ids.isEmpty() || busy || pendingRecordExport != null) return
+        pendingRecordExport = ids.toSet()
+        try {
+            launch()
+        } catch (_: Exception) {
+            pendingRecordExport = null
+            message = "无法打开系统文件选择器。"
+        }
+    }
+
+    fun saveRecordExport(uri: Uri?) {
+        val ids = pendingRecordExport
+        pendingRecordExport = null
+        if (uri == null) return
+        if (ids == null) {
+            message = "导出选择已失效，请重新选择记录。"
+            return
+        }
+        operation("导出失败，请检查目标位置、附件及剩余空间。") {
+            val count = repository.exportRecords(uri, ids)
+            message = "已导出 $count 条记录"
+        }
     }
 
     fun inspect(uri: Uri) = operation("无法读取所选备份。") {
