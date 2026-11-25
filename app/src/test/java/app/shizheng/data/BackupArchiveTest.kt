@@ -69,12 +69,21 @@ class BackupArchiveTest {
 
     @Test fun restoresVersionOneAndRoundTripsUndatedRecordsWithRetiredCategories() {
         val fixture = prepareFixture()
-        val zip = entries(encoded(fixture))
+        val training = Category.TRAINING
+        val oldRecord = fixture.first.records.single().copy(category = training.id)
+        val oldSnapshot = fixture.first.copy(records = listOf(oldRecord), categories = legacyCategories)
+        val oldZip = encoded(oldSnapshot to fixture.second)
+        archive.prepare(oldZip.inputStream(), temp.root).use { assertEquals(oldSnapshot, it.snapshot) }
+
+        val zip = entries(oldZip)
         val manifest = Json.parseToJsonElement(zip.getValue("manifest.json").decodeToString()).jsonObject
         val oldData = JsonObject(manifest.getValue("data").jsonObject - "categories")
         val oldManifest = JsonObject(manifest + mapOf("version" to JsonPrimitive(1), "data" to oldData))
         val legacy = zipped(zip + ("manifest.json" to oldManifest.toString().encodeToByteArray()))
-        archive.prepare(legacy.inputStream(), temp.root).use { assertEquals(fixture.first, it.snapshot) }
+        archive.prepare(legacy.inputStream(), temp.root).use {
+            val updated = oldSnapshot.copy(categories = defaultCategories + RecordCategory(training.id, training.label, active = false))
+            assertEquals(updated, it.snapshot)
+        }
 
         val category = RecordCategory(newId(), "历史自定义类别", false)
         val record = fixture.first.records.single().copy(category = category.id, start = "", end = null)

@@ -19,7 +19,7 @@ class RecordRepository(context: Context) {
     private val app = context.applicationContext
     private val databaseName = "shizheng.db"
     private val db = Room.databaseBuilder(app, AppDatabase::class.java, databaseName)
-        .addMigrations(AppDatabase.MIGRATION_1_2).build()
+        .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3).build()
     private val dao = db.records()
     private val mutex = Mutex()
     private val mutableData = MutableStateFlow(Snapshot())

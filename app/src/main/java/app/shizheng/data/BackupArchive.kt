@@ -78,8 +78,10 @@ class BackupArchive(private val validateContent: (File, EvidenceKind) -> Unit) {
                 if (version !in 1..VERSION) throw UserError("这个备份格式版本暂不支持。")
                 val snapshot = tree["data"]?.jsonObject ?: invalid()
                 if ((version == 1) == ("categories" in snapshot)) invalid()
-                val data = json.decodeFromJsonElement<BackupManifest>(tree).data
-                validate(data, legacy = version == 1)
+                val decoded = json.decodeFromJsonElement<BackupManifest>(tree).data
+                val legacy = version == 1
+                val data = if (legacy) decoded.copy(categories = legacyCategories) else decoded
+                validate(data, legacy)
                 if (entries.keys != data.evidence.mapTo(hashSetOf(), ::entryName)) invalid()
                 for (item in data.evidence) {
                     val entry = entries.getValue(entryName(item))
@@ -93,7 +95,13 @@ class BackupArchive(private val validateContent: (File, EvidenceKind) -> Unit) {
                     if (digest != ContentDigest(item.size, item.sha256)) invalid()
                     validateContent(target, item.kind)
                 }
-                data
+                if (legacy) {
+                    val training = Category.TRAINING
+                    val retired = if (data.records.any { it.category == training.id }) {
+                        listOf(RecordCategory(training.id, training.label, active = false))
+                    } else emptyList()
+                    data.copy(categories = defaultCategories + retired)
+                } else data
             }
             archive.delete()
             return PreparedBackup(snapshot, staging)
@@ -132,7 +140,7 @@ class BackupArchive(private val validateContent: (File, EvidenceKind) -> Unit) {
         val categories = hashSetOf<String>()
         val activeNames = hashSetOf<String>()
         for (category in data.categories) {
-            if ((!validId(category.id) && defaultCategories.none { it.id == category.id }) ||
+            if ((!validId(category.id) && legacyCategories.none { it.id == category.id }) ||
                 !categories.add(category.id) || category.name != category.name.trim() ||
                 category.name.isBlank() || category.name.length > CATEGORY_LIMIT || category.name.any(Char::isISOControl) ||
                 (category.active && !activeNames.add(category.name.lowercase()))

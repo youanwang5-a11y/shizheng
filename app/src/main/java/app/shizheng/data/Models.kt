@@ -9,9 +9,12 @@ import kotlinx.serialization.Serializable
 import java.time.LocalDate
 import java.util.UUID
 
-enum class Category(val label: String) {
-    COMPETITION("竞赛"), VOLUNTEER("志愿服务"), PRACTICE("社会实践"), RESEARCH("科研"),
-    CULTURE("文体活动"), HONOR("荣誉表彰"), TRAINING("培训"), OTHER("其他")
+enum class Category(val label: String, private val stableId: String? = null) {
+    COMPETITION("竞赛"), VOLUNTEER("志愿服务"), PRACTICE("社会工作"), RESEARCH("科研"),
+    CULTURE("文体活动"), HONOR("荣誉表彰"), TRAINING("培训"),
+    ACADEMIC("学业学情", "b9b92b4d-cfb1-540f-9ec8-762dd92ed41d"), OTHER("其他");
+
+    val id: String get() = stableId ?: name
 }
 
 @Serializable
@@ -22,7 +25,14 @@ data class RecordCategory(
     val active: Boolean = true
 )
 
-val defaultCategories = Category.entries.map { RecordCategory(it.name, it.label) }
+val defaultCategories = Category.entries.filterNot { it == Category.TRAINING }.map { RecordCategory(it.id, it.label) }
+internal const val OLD_PRACTICE_LABEL = "社会实践"
+internal val legacyCategories = listOf(
+    RecordCategory("COMPETITION", "竞赛"), RecordCategory("VOLUNTEER", "志愿服务"),
+    RecordCategory("PRACTICE", OLD_PRACTICE_LABEL), RecordCategory("RESEARCH", "科研"),
+    RecordCategory("CULTURE", "文体活动"), RecordCategory("HONOR", "荣誉表彰"),
+    RecordCategory("TRAINING", "培训"), RecordCategory("OTHER", "其他")
+)
 const val CATEGORY_LIMIT = 40
 
 enum class Level(val label: String) {

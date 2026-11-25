@@ -228,14 +228,14 @@ private fun RecordToolbarControl(
 @Composable
 private fun CategoryIllustration(category: String) {
     val illustration = when (category) {
-        Category.COMPETITION.name -> R.drawable.illustration_competition
-        Category.VOLUNTEER.name -> R.drawable.illustration_volunteer
-        Category.CULTURE.name -> R.drawable.illustration_culture
-        Category.PRACTICE.name -> R.drawable.illustration_practice
-        Category.RESEARCH.name -> R.drawable.illustration_research
-        Category.HONOR.name -> R.drawable.illustration_honor
-        Category.TRAINING.name -> R.drawable.illustration_training
-        Category.OTHER.name -> R.drawable.illustration_other
+        Category.COMPETITION.id -> R.drawable.illustration_competition
+        Category.VOLUNTEER.id -> R.drawable.illustration_volunteer
+        Category.CULTURE.id -> R.drawable.illustration_culture
+        Category.PRACTICE.id -> R.drawable.illustration_practice
+        Category.RESEARCH.id -> R.drawable.illustration_research
+        Category.HONOR.id -> R.drawable.illustration_honor
+        Category.TRAINING.id, Category.ACADEMIC.id -> R.drawable.illustration_training
+        Category.OTHER.id -> R.drawable.illustration_other
         else -> R.drawable.illustration_custom
     }
     Image(

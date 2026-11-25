@@ -6,7 +6,10 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.shizheng.data.AppDatabase
 import app.shizheng.data.Category
+import app.shizheng.data.RecordCategory
+import app.shizheng.data.RecordsDao
 import app.shizheng.data.defaultCategories
+import app.shizheng.data.legacyCategories
 import app.shizheng.data.newId
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
@@ -17,16 +20,68 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class RoomMigrationTest {
     @Test fun upgradesExportedVersionOneWithoutChangingExistingRelations() = runBlocking {
+        val term = newId()
+        val record = newId()
+        val evidence = newId()
+        withMigratedDatabase(1, seed = { db ->
+            db.execSQL("INSERT INTO terms VALUES (?, '旧学期', '2026-09-01', '2027-01-31', 1)", arrayOf(term))
+            db.execSQL("INSERT INTO records VALUES (?, '旧记录', 'PRACTICE', NULL, '2026-11-24', NULL, ?, 0, '', '', '')",
+                arrayOf(record, term))
+            db.execSQL("INSERT INTO evidence VALUES (?, ?, '旧证明.pdf', 'PDF', 0, 10, ?)",
+                arrayOf(evidence, record, "a".repeat(64)))
+        }) { dao ->
+            val saved = dao.records().single()
+            assertEquals(record, saved.id)
+            assertEquals(term, saved.termId)
+            assertEquals(Category.PRACTICE.id, saved.category)
+            assertEquals("2026-11-24", saved.start)
+            assertTrue(dao.terms().single().current)
+            assertEquals(evidence, dao.evidence().single().id)
+            assertEquals(record, dao.evidence().single().recordId)
+            val categories = dao.categories()
+            assertEquals(defaultCategories.toSet(), categories.filter(RecordCategory::active).toSet())
+            assertEquals("社会工作", categories.single { it.id == saved.category }.name)
+            assertFalse(categories.single { it.id == Category.TRAINING.id }.active)
+        }
+    }
+
+    @Test fun upgradesVersionTwoAndKeepsRetiredAndCustomCategoryAssociations() = runBlocking {
+        val record = newId()
+        val socialWork = RecordCategory(newId(), "社会工作")
+        val academic = RecordCategory(newId(), "学业学情", active = false)
+        val oldCategories = legacyCategories.map {
+            if (it.id == Category.VOLUNTEER.id) it.copy(active = false) else it
+        } + listOf(socialWork, academic)
+        withMigratedDatabase(2, seed = { db ->
+            for (category in oldCategories) {
+                db.execSQL("INSERT INTO categories VALUES (?, ?, ?)",
+                    arrayOf(category.id, category.name, if (category.active) 1 else 0))
+            }
+            db.execSQL("INSERT INTO records VALUES (?, '旧培训', 'TRAINING', NULL, '', NULL, NULL, 0, '', '', '')",
+                arrayOf(record))
+        }) { dao ->
+            val categories = dao.categories().associateBy(RecordCategory::id)
+            assertEquals(socialWork, categories.getValue(socialWork.id))
+            assertEquals(academic, categories.getValue(academic.id))
+            assertFalse(Category.ACADEMIC.id in categories)
+            assertFalse(categories.getValue(Category.VOLUNTEER.id).active)
+            assertEquals(RecordCategory(Category.PRACTICE.id, "社会实践", active = false), categories[Category.PRACTICE.id])
+            val saved = dao.records().single()
+            assertEquals(record, saved.id)
+            assertEquals(RecordCategory(Category.TRAINING.id, "培训", active = false), categories[saved.category])
+        }
+    }
+
+    private suspend fun withMigratedDatabase(
+        version: Int, seed: (SQLiteDatabase) -> Unit, verify: suspend (RecordsDao) -> Unit
+    ) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
-        val schema = instrumentation.context.assets.open("app.shizheng.data.AppDatabase/1.json")
+        val schema = instrumentation.context.assets.open("app.shizheng.data.AppDatabase/$version.json")
             .bufferedReader().use { JSONObject(it.readText()).getJSONObject("database") }
         val name = "migration-${newId()}.db"
         val file = context.getDatabasePath(name)
         file.parentFile?.mkdirs()
-        val term = newId()
-        val record = newId()
-        val evidence = newId()
         try {
             SQLiteDatabase.openOrCreateDatabase(file, null).use { db ->
                 val entities = schema.getJSONArray("entities")
@@ -41,31 +96,18 @@ class RoomMigrationTest {
                 }
                 val setup = schema.getJSONArray("setupQueries")
                 for (i in 0 until setup.length()) db.execSQL(setup.getString(i))
-                db.execSQL("INSERT INTO terms VALUES (?, '旧学期', '2026-09-01', '2027-01-31', 1)", arrayOf(term))
-                db.execSQL("INSERT INTO records VALUES (?, '旧记录', 'VOLUNTEER', NULL, '2026-11-24', NULL, ?, 0, '', '', '')",
-                    arrayOf(record, term))
-                db.execSQL("INSERT INTO evidence VALUES (?, ?, '旧证明.pdf', 'PDF', 0, 10, ?)",
-                    arrayOf(evidence, record, "a".repeat(64)))
-                db.version = 1
+                seed(db)
+                db.version = version
             }
-            val db = Room.databaseBuilder(context, AppDatabase::class.java, name).addMigrations(AppDatabase.MIGRATION_1_2).build()
+            val db = Room.databaseBuilder(context, AppDatabase::class.java, name)
+                .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3).build()
             try {
-                val dao = db.records()
-                val saved = dao.records().single()
-                assertEquals(record, saved.id)
-                assertEquals(term, saved.termId)
-                assertEquals(Category.VOLUNTEER.name, saved.category)
-                assertEquals("2026-11-24", saved.start)
-                assertTrue(dao.terms().single().current)
-                assertEquals(evidence, dao.evidence().single().id)
-                assertEquals(record, dao.evidence().single().recordId)
-                assertEquals(defaultCategories.toSet(), dao.categories().toSet())
+                verify(db.records())
             } finally {
                 db.close()
             }
         } finally {
             context.deleteDatabase(name)
         }
-        Unit
     }
 }
