@@ -34,6 +34,6 @@ macOS 和 Linux 使用 `./gradlew`。调试 APK 包名为 `app.shizheng.debug`�
 - `app/src/main/java/app/shizheng/ai` 管理 AI 协议和本机凭据。
 - `app/src/main/java/app/shizheng/ui` 实现 Compose 页面和流程。
 - `app/schemas` 保存数据库版本结构。单元测试在 `app/src/test`，设备测试在 `app/src/androidTest`。
-- `design` 保存 v1、v2 概念图和生图提示词。`docs` 保存规范、测试、版本和竞赛过程资料。
+- `design` 保存 v1、v2 概念图和生图提示词。[UI 视觉探索](generated-images/ui-exploration-2026-11-25/README.md)收录深色档案、插画手账和浅色极简三套概念图。`docs` 保存规范、测试、版本和竞赛过程资料。
 
 [产品规范](docs/PRODUCT_SPEC.md) · [架构](docs/ARCHITECTURE.md) · [测试报告](docs/TEST_REPORT.md) · [版本管理及回档](docs/VERSIONING.md)
