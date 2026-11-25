@@ -53,7 +53,7 @@ internal fun ShizhengApp(state: AppState) {
                 Screen.TERM -> { state.termDraft = null; state.screen = Screen.TERMS }
                 Screen.CATEGORIES -> state.screen = state.categoriesReturn
                 Screen.AI_SETTINGS -> if (state.aiSettingsDirty) leaveSettings = true else state.screen = state.settingsReturn
-                Screen.TERMS, Screen.BACKUP, Screen.AI, Screen.ABOUT -> state.screen = Screen.MINE
+                Screen.TERMS, Screen.BACKUP, Screen.ABOUT -> state.screen = Screen.MINE
                 else -> Unit
             }
         }
@@ -70,6 +70,7 @@ internal fun ShizhengApp(state: AppState) {
         }
     }
     val photos = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(50)) { state.importFiles(it) }
+    val aiPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { it?.let(state::importAiPhoto) }
     val files = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { state.importFiles(it) }
     val actions = EvidenceActions(
         camera = {
@@ -115,7 +116,6 @@ internal fun ShizhengApp(state: AppState) {
                 title = {
                     Text(
                         if (screen == Screen.EDITOR) when {
-                            state.reviewingAi -> "核对 AI 草稿"
                             state.editingExisting -> "编辑记录"
                             else -> "新建记录"
                         } else screen.title, fontWeight = FontWeight.SemiBold
@@ -158,7 +158,11 @@ internal fun ShizhengApp(state: AppState) {
                 Screen.RECORDS -> RecordList(state, data)
                 Screen.MINE -> Mine(state, data)
                 Screen.DETAIL -> data.records.firstOrNull { it.id == state.recordId }?.let { RecordDetail(state, data, it) }
-                Screen.EDITOR, Screen.EXTRAS -> state.draft?.let { EditRecord(state, data, it, screen == Screen.EXTRAS, actions) }
+                Screen.EDITOR, Screen.EXTRAS -> state.draft?.let {
+                    EditRecord(state, data, it, screen == Screen.EXTRAS, actions) {
+                        launchPicker(state) { aiPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+                    }
+                }
                 Screen.PREVIEW -> state.shownEvidence?.let { EvidencePreview(state, it, exportFile) }
                 Screen.TERMS -> Terms(state, data)
                 Screen.TERM -> state.termDraft?.let { TermEdit(state, it) }
@@ -166,7 +170,6 @@ internal fun ShizhengApp(state: AppState) {
                 Screen.BACKUP -> BackupScreen(state, backup) {
                     launchPicker(state) { selectBackup.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) }
                 }
-                Screen.AI -> AiRecord(state)
                 Screen.AI_SETTINGS -> AiSettings(state)
                 Screen.ABOUT -> About()
             }

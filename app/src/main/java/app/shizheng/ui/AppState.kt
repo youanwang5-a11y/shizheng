@@ -7,10 +7,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import app.shizheng.BuildConfig
 import app.shizheng.ai.AiClient
 import app.shizheng.ai.AiConfig
 import app.shizheng.ai.AiConfigStore
+import app.shizheng.ai.AiDestination
 import app.shizheng.data.Evidence
+import app.shizheng.data.EvidenceKind
 import app.shizheng.data.PreparedBackup
 import app.shizheng.data.Record
 import app.shizheng.data.RecordDraft
@@ -29,19 +32,24 @@ import java.io.File
 internal enum class Screen(val title: String) {
     RECORDS("拾证"), MINE("我的"), DETAIL("记录详情"), EDITOR("录入记录"),
     EXTRAS("补充信息与证明"), PREVIEW("证明预览"), TERMS("学期管理"), TERM("编辑学期"),
-    BACKUP("备份与恢复"), AI("AI 记录"), AI_SETTINGS("AI 设置"), CATEGORIES("类别管理"), ABOUT("关于应用")
+    BACKUP("备份与恢复"), AI_SETTINGS("AI 设置"), CATEGORIES("类别管理"), ABOUT("关于应用")
 }
 
-internal class AppState @JvmOverloads constructor(app: Application, private val aiClient: AiClient = AiClient()) : AndroidViewModel(app) {
+internal class AppState @JvmOverloads constructor(
+    app: Application,
+    private val aiClient: AiClient = AiClient(builtInKey = BuildConfig.DEEPSEEK_API_KEY)
+) : AndroidViewModel(app) {
     val repository = RecordRepository(app)
     val data = repository.data
     private val aiStore = AiConfigStore(app)
-    var configuration by mutableStateOf(AiConfig())
+    var configuration by mutableStateOf(AiConfig.builtInDefault())
         private set
     var configDraft by mutableStateOf(AiConfig())
     var settingsReturn by mutableStateOf(Screen.MINE)
         private set
     var aiText by mutableStateOf("")
+    var aiPhoto by mutableStateOf<Evidence?>(null)
+        private set
     var testStatus by mutableStateOf("")
         private set
     private var aiJob: Job? = null
@@ -69,7 +77,7 @@ internal class AppState @JvmOverloads constructor(app: Application, private val 
     var reviewingAi by mutableStateOf(false)
         private set
     val editingExisting get() = editorReturn == Screen.DETAIL
-    val unsaved get() = draft != original || reviewingAi
+    val unsaved get() = draft != original || reviewingAi || aiText.isNotBlank()
     var shownEvidence by mutableStateOf<Evidence?>(null)
         private set
     private var previewReturn = Screen.DETAIL
@@ -102,19 +110,13 @@ internal class AppState @JvmOverloads constructor(app: Application, private val 
         screen = Screen.DETAIL
     }
 
-    fun editRecord(record: Record? = null, extras: Boolean = false) {
+    fun editRecord(record: Record? = null, extras: Boolean = false, from: Screen = Screen.RECORDS) {
         val initial = record?.let { RecordDraft.from(it, data.value.filesFor(it.id)) }
             ?: RecordDraft(termId = data.value.currentTermId)
-        setEditor(initial, if (record == null) Screen.RECORDS else Screen.DETAIL)
-        if (extras) screen = Screen.EXTRAS
-    }
-
-    private fun setEditor(value: RecordDraft, returnTo: Screen) {
-        draft = value
-        original = value
-        editorReturn = returnTo
-        reviewingAi = returnTo == Screen.AI
-        screen = Screen.EDITOR
+        draft = initial
+        original = initial
+        editorReturn = if (record == null) from else Screen.DETAIL
+        screen = if (extras) Screen.EXTRAS else Screen.EDITOR
     }
 
     fun updateDraft(change: (RecordDraft) -> RecordDraft) { draft = draft?.let(change) }
@@ -122,12 +124,7 @@ internal class AppState @JvmOverloads constructor(app: Application, private val 
     fun storeDraft() = operation("保存失败，请检查存储空间后重试。") {
         val current = draft ?: return@operation
         val id = repository.save(current)
-        val returnTo = when (editorReturn) {
-            Screen.AI -> Screen.MINE
-            Screen.DETAIL -> detailReturn
-            else -> Screen.RECORDS
-        }
-        if (reviewingAi) aiText = ""
+        val returnTo = if (editingExisting) detailReturn else editorReturn
         clearDraft()
         openRecord(id, returnTo)
         message = "已保存"
@@ -143,6 +140,8 @@ internal class AppState @JvmOverloads constructor(app: Application, private val 
         original = null
         draft = null
         reviewingAi = false
+        aiText = ""
+        aiPhoto = null
     }
 
     fun deleteRecord() = operation("删除失败，请重试。") {
@@ -184,6 +183,23 @@ internal class AppState @JvmOverloads constructor(app: Application, private val 
         }
     }
 
+    fun importAiPhoto(uri: Uri) = operation("无法读取所选照片，请重新选择。") {
+        val current = draft ?: return@operation
+        val store = repository.evidence
+        val item = withContext(Dispatchers.IO) {
+            store.import(current.id, uri, current.files.size).also {
+                if (it.kind != EvidenceKind.PHOTO) {
+                    store.remove(it)
+                    throw UserError("请选择照片。")
+                }
+            }
+        }
+        updateDraft { it.copy(files = it.files + item) }
+        aiPhoto = item
+    }
+
+    fun selectAiPhoto(item: Evidence?) { aiPhoto = item }
+
     fun renameFile(item: Evidence, name: String) {
         if (name.isBlank()) {
             message = "请输入附件名称。"
@@ -205,6 +221,7 @@ internal class AppState @JvmOverloads constructor(app: Application, private val 
     fun deleteFile(item: Evidence) = operation("未能移除该附件。") {
         repository.deleteDraftFile(item)
         updateDraft { it.copy(files = it.files.filterNot { file -> file.id == item.id }) }
+        if (aiPhoto?.id == item.id) aiPhoto = null
     }
 
     fun preview(item: Evidence) {
@@ -322,9 +339,11 @@ internal class AppState @JvmOverloads constructor(app: Application, private val 
         testStatus = ""
     }
 
+    fun aiDestination(config: AiConfig): Result<AiDestination> = runCatching { aiClient.destination(config) }
+
     fun saveSettings() = operation("AI 配置保存失败。") {
         val setting = configDraft.normalized()
-        if (setting.enabled) setting.requireComplete()
+        if (setting.enabled) aiClient.destination(setting)
         withContext(Dispatchers.IO) { aiStore.write(setting) }
         configuration = setting
         aiSettingsDirty = false
@@ -338,9 +357,32 @@ internal class AppState @JvmOverloads constructor(app: Application, private val 
         runAi { aiClient.test(settings); testStatus = "服务已成功响应所选模型。" }
     }
 
-    fun generateDraft() {
+    fun fillDraft() {
+        val id = draft?.id ?: return
         val content = aiText
-        runAi { setEditor(aiClient.generate(configuration, content).copy(termId = data.value.currentTermId), Screen.AI) }
+        val photo = aiPhoto
+        val settings = configuration
+        val categories = data.value.categories
+        runAi {
+            val image = photo?.let { withContext(Dispatchers.IO) { repository.evidence.photoForRecognition(it) } }
+            val fields = withContext(Dispatchers.Default) { aiClient.generate(settings, content, categories, image) }
+            if (draft?.id != id) return@runAi
+            updateDraft { current ->
+                val canFillDate = current.start.isBlank() && current.end.isBlank()
+                current.copy(
+                    title = current.title.ifBlank { fields.title },
+                    category = current.category ?: fields.category,
+                    level = current.level ?: fields.level,
+                    start = current.start.ifBlank { if (canFillDate) fields.start else "" },
+                    end = if (canFillDate) fields.end else current.end,
+                    ranged = if (canFillDate && fields.start.isNotBlank()) fields.ranged else current.ranged,
+                    organization = current.organization.ifBlank { fields.organization },
+                    result = current.result.ifBlank { fields.result },
+                    notes = current.notes.ifBlank { fields.notes }
+                )
+            }
+            reviewingAi = true
+        }
     }
 
     fun cancelAi() { aiJob?.cancel() }

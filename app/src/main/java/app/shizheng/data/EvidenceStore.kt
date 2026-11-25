@@ -11,6 +11,7 @@ import android.os.ParcelFileDescriptor
 import android.provider.OpenableColumns
 import androidx.core.content.FileProvider
 import java.io.File
+import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 import java.security.MessageDigest
@@ -81,6 +82,19 @@ class EvidenceStore(private val context: Context) {
         context.contentResolver.openOutputStream(uri, "wt")?.use { output ->
             target.inputStream().use { it.copyTo(output) }
         } ?: throw UserError("无法写入选中的位置。")
+    }
+
+    fun photoForRecognition(item: Evidence): ByteArray {
+        if (item.kind != EvidenceKind.PHOTO) throw UserError("请选择照片。")
+        val preview = decodePhoto(file(item), 2000)
+        return try {
+            ByteArrayOutputStream().use { output ->
+                if (!preview.compress(Bitmap.CompressFormat.JPEG, 88, output)) throw UserError("照片不可读，请重新选择。")
+                output.toByteArray()
+            }
+        } finally {
+            preview.recycle()
+        }
     }
 
     fun exportNameAndType(item: Evidence): Pair<String, String> {

@@ -65,10 +65,10 @@ internal fun Help(text: String) =
     Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
 @Composable
-internal fun Field(value: String, label: String, limit: Int, lines: Int = 1, onChange: (String) -> Unit) {
+internal fun Field(value: String, label: String, limit: Int, lines: Int = 1, maxLines: Int = Int.MAX_VALUE, onChange: (String) -> Unit) {
     OutlinedTextField(
         value, { if (it.length <= limit) onChange(it) },
-        Modifier.fillMaxWidth(), label = { Text(label) }, minLines = lines, singleLine = lines == 1,
+        Modifier.fillMaxWidth(), label = { Text(label) }, minLines = lines, maxLines = maxLines, singleLine = lines == 1,
         shape = MaterialTheme.shapes.medium
     )
 }

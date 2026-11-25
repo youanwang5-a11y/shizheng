@@ -18,6 +18,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
+import okio.Buffer
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -56,13 +57,13 @@ class RecordFlowTest {
             click("清空")
             click("我的")
             click("AI 记录")
-            waitFor("需要配置 AI")
-            click("去配置")
+            waitFor("AI 已关闭。")
+            click("打开 AI 设置")
             waitFor("测试连接")
-            ui.onNodeWithText("生成记录草稿").assertDoesNotExist()
+            ui.onNodeWithText("识别并填入").assertDoesNotExist()
             clickDescription("返回")
-            waitFor("需要配置 AI")
-            click("暂不使用")
+            waitFor("AI 已关闭。")
+            clickDescription("返回")
             click("AI 设置")
             waitFor("测试连接")
             clickDescription("返回")
@@ -76,10 +77,10 @@ class RecordFlowTest {
         }
     }
 
-    @Test fun confirmsMockAiSendThenExplicitlySavesEditedOrdinaryRecord() {
+    @Test fun fillsNewRecordWithBuiltInAiAfterConfirmationAndKeepsManualFields() {
         val config = AiConfigStore(app)
         val previous = config.read()
-        config.write(AiConfig(true, "https://mock.invalid/v1", "device-fixture-token", "test-model"))
+        config.write(AiConfig.builtInDefault())
         val requests = java.util.concurrent.atomic.AtomicInteger()
         val input = "2026年11月24日参加校内光学竞赛。"
         val answer = """{"title":"校内光学竞赛","category":"竞赛","start":"2026-11-24"}"""
@@ -89,38 +90,48 @@ class RecordFlowTest {
             })
         }.toString()
         val transport = OkHttpClient.Builder().addInterceptor { chain ->
+            val request = chain.request()
+            check(request.url.toString() == "https://api.deepseek.com/chat/completions")
+            check(request.header("Authorization") == "Bearer device-fixture-token")
+            val buffer = Buffer()
+            request.body?.writeTo(buffer)
+            val body = buffer.readUtf8()
+            check(body.contains("deepseek-flash") && body.contains(input))
             val result = requests.incrementAndGet()
             Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
                 .code(if (result == 1) 401 else 200).message("Mock response").body(reply.toResponseBody()).build()
         }.build()
         try {
-            val state = render(AiClient(transport))
+            val state = render(AiClient(transport, builtInKey = "device-fixture-token"))
             val before = state.data.value.records.size
-            click("我的")
-            click("AI 记录")
-            ui.onNode(hasSetTextAction() and hasText("经历文字")).performTextInput(input)
-            click("生成记录草稿")
+            clickDescription("新增记录")
+            ui.onNode(hasSetTextAction() and hasText("名称 *")).performScrollTo()
+                .performTextInput("设备测试·已核对的竞赛")
+            ui.onNode(hasSetTextAction() and hasText("描述你的经历")).performScrollTo().performTextInput(input)
+            ui.onNodeWithText("识别并填入").performScrollTo().performClick()
             waitFor("目标服务")
             assertEquals(0, requests.get())
             assertEquals(before, state.data.value.records.size)
-            click("确认发送并生成")
-            waitFor("服务鉴权失败，请检查 API Key 与模型权限。")
+            click("确认发送并填写")
+            waitFor("内置 DeepSeek 鉴权失败，请联系分发者。")
             ui.onNodeWithText("请核对识别结果").assertDoesNotExist()
             assertEquals(before, state.data.value.records.size)
-            click("生成记录草稿")
-            click("确认发送并生成")
+            ui.onNodeWithText("识别并填入").performScrollTo().performClick()
+            click("确认发送并填写")
             waitFor("请核对识别结果")
             assertEquals(2, requests.get())
             assertEquals(before, state.data.value.records.size)
-            ui.onNode(hasSetTextAction() and hasText("名称 *")).performTextReplacement("设备测试·已核对的竞赛")
+            assertEquals("设备测试·已核对的竞赛", state.draft?.title)
             click("保存记录")
             waitFor("设备测试·已核对的竞赛")
-            val record = state.data.value.records.single { it.title == "设备测试·已核对的竞赛" }
+            val record = state.data.value.records.last { it.title == "设备测试·已核对的竞赛" }
             assertTrue(state.data.value.filesFor(record.id).isEmpty())
+            assertEquals("2026-11-24", record.start)
             assertEquals(before + 1, state.data.value.records.size)
             val encrypted = app.getSharedPreferences("ai_config_encrypted", 0).all.toString()
             assertFalse(encrypted.contains("device-fixture-token"))
-            assertEquals("test-model", config.read().model)
+            assertTrue(config.read().useBuiltIn)
+            assertTrue(config.read().key.isEmpty())
         } finally {
             config.write(previous)
         }

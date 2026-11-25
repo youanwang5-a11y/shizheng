@@ -123,7 +123,9 @@ private fun FilterDialog(filter: RecordFilter, data: Snapshot, dismiss: () -> Un
 }
 
 @Composable
-internal fun EditRecord(state: AppState, data: Snapshot, draft: RecordDraft, extras: Boolean, actions: EvidenceActions) {
+internal fun EditRecord(
+    state: AppState, data: Snapshot, draft: RecordDraft, extras: Boolean, actions: EvidenceActions, selectAiPhoto: () -> Unit
+) {
     Column(Modifier.fillMaxWidth()) {
         Page(Modifier.weight(1f)) {
             if (extras) {
@@ -143,16 +145,17 @@ internal fun EditRecord(state: AppState, data: Snapshot, draft: RecordDraft, ext
                     }
                 }
             } else {
+                if (!state.editingExisting) AiEntry(state, data, draft, selectAiPhoto)
                 if (state.reviewingAi) Panel {
                     Heading("请核对识别结果")
-                    Help("核对名称、类别、完整日期等信息，再保存为普通记录。")
+                    Help("请核对填入的信息。单位、结果和备注可在补充信息中查看。")
                 }
                 Field(draft.title, "名称 *", TITLE_LIMIT) { input -> state.updateDraft { it.copy(title = input) } }
                 Choice("类别 *", data.categoryName(draft.category) ?: "请选择", data.categories
                     .filter { it.active || it.id == draft.category }.map { it.id to it.name }) { category ->
                     state.updateDraft { it.copy(category = category) }
                 }
-                TextButton(state::openCategories) { Text("管理类别") }
+                TextButton(state::openCategories, enabled = !state.aiWorking) { Text("管理类别") }
                 Choice("级别（选填）", draft.level?.label ?: "未选择", listOf(null to "未选择") + Level.entries.map { it to it.label }) { level ->
                     state.updateDraft { it.copy(level = level) }
                 }
@@ -180,8 +183,8 @@ internal fun EditRecord(state: AppState, data: Snapshot, draft: RecordDraft, ext
         }
         HorizontalDivider()
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Button(state::storeDraft, Modifier.fillMaxWidth()) { Text("保存记录") }
-            if (!extras) OutlinedButton({ state.screen = Screen.EXTRAS }, Modifier.fillMaxWidth()) {
+            Button(state::storeDraft, Modifier.fillMaxWidth(), enabled = !state.aiWorking) { Text("保存记录") }
+            if (!extras) OutlinedButton({ state.screen = Screen.EXTRAS }, Modifier.fillMaxWidth(), enabled = !state.aiWorking) {
                 Text("补充信息与证明（可选）")
             }
         }

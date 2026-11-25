@@ -1,6 +1,8 @@
 package app.shizheng.ai
 
 import app.shizheng.data.Category
+import app.shizheng.data.RecordCategory
+import app.shizheng.data.newId
 import app.shizheng.data.UserError
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
@@ -68,8 +70,24 @@ class AiClientTest {
         val json = Json.parseToJsonElement(payload).jsonObject
         assertEquals("mock-model", json.getValue("model").jsonPrimitive.content)
         val messages = json.getValue("messages").jsonArray
-        assertEquals(DRAFT_INSTRUCTIONS, messages[0].jsonObject.getValue("content").jsonPrimitive.content)
+        assertTrue(messages[0].jsonObject.getValue("content").jsonPrimitive.content.startsWith(DRAFT_INSTRUCTIONS))
         assertEquals(source, messages[1].jsonObject.getValue("content").jsonPrimitive.content)
+    }
+
+    @Test fun sendsImageAndMapsCustomCategoryAndVisibleFacts() = runBlocking {
+        val category = RecordCategory(newId(), "项目展示")
+        server.enqueue(answer("""{"title":"光学展演","category":"项目展示","organization":"模拟学院","result":"一等奖","start":"2026-11-10","transcription":"光学展演\n模拟学院\n2026年11月10日"}"""))
+        val result = AiClient(transport).generate(settings, "", listOf(category), byteArrayOf(1, 2, 3))
+        assertEquals("光学展演", result.title)
+        assertEquals(category.id, result.category)
+        assertEquals("模拟学院", result.organization)
+        assertEquals("2026-11-10", result.start)
+        assertEquals("", result.result)
+        val request = server.takeRequest(2, TimeUnit.SECONDS) ?: error("Missing request")
+        val messages = Json.parseToJsonElement(request.body.readUtf8()).jsonObject.getValue("messages").jsonArray
+        assertTrue(messages[0].jsonObject.getValue("content").jsonPrimitive.content.contains("项目展示"))
+        val parts = messages[1].jsonObject.getValue("content").jsonArray
+        assertEquals("data:image/jpeg;base64,AQID", parts[1].jsonObject.getValue("image_url").jsonObject.getValue("url").jsonPrimitive.content)
     }
 
     @Test fun doesNotInventDatesAwardsOrOrganizations() = runBlocking {

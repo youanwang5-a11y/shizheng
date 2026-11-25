@@ -7,6 +7,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.shizheng.BuildConfig
 import app.shizheng.data.Snapshot
 import app.shizheng.data.CATEGORY_LIMIT
 import app.shizheng.data.RecordCategory
@@ -32,11 +33,12 @@ internal fun Mine(state: AppState, data: Snapshot) {
         }
         MenuItem("类别管理", "添加或删除记录类别", state::openCategories)
         MenuItem("备份与恢复", "保存或迁移记录和原始证明") { state.screen = Screen.BACKUP }
-        MenuItem("AI 记录", "从经历文字生成可编辑草稿") { state.screen = Screen.AI }
-        MenuItem("AI 设置", if (state.configuration.isReady) "已启用 · ${state.configuration.model}" else "开关、接口与模型") {
+        MenuItem("AI 记录", "用经历描述或照片填写新记录") { state.editRecord(from = Screen.MINE) }
+        val ai = state.aiDestination(state.configuration).getOrNull()
+        MenuItem("AI 设置", if (state.configuration.enabled && ai != null) "已启用 · ${ai.model}" else "开关、接口与模型") {
             state.openSettings(Screen.MINE)
         }
-        MenuItem("关于应用", "拾证 · 版本 0.1.0") { state.screen = Screen.ABOUT }
+        MenuItem("关于应用", "拾证 · 版本 ${BuildConfig.VERSION_NAME}") { state.screen = Screen.ABOUT }
     }
 }
 
@@ -146,7 +148,7 @@ internal fun BackupScreen(state: AppState, create: () -> Unit, select: () -> Uni
 internal fun About() = Page {
     Panel {
         Heading("拾证")
-        Help("版本 0.1.0")
+        Help("版本 ${BuildConfig.VERSION_NAME}")
         Text("把比赛、活动和志愿服务等经历与对应证明放在一起。")
         Help("记录保存在本机。换手机前请通过「备份与恢复」保存备份。启用 AI 并确认时，输入的文字会发送到你配置的服务。")
     }

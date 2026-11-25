@@ -7,6 +7,11 @@ plugins {
     id("androidx.room")
 }
 
+val deepSeekBuildKey = providers.environmentVariable("SHIZHENG_DEEPSEEK_API_KEY").orElse("").get()
+require(deepSeekBuildKey.isEmpty() || deepSeekBuildKey.matches(Regex("[A-Za-z0-9_-]{20,256}"))) {
+    "SHIZHENG_DEEPSEEK_API_KEY has an invalid format."
+}
+
 android {
     namespace = "app.shizheng"
     compileSdk = 36
@@ -15,13 +20,20 @@ android {
         applicationId = "app.shizheng"
         minSdk = 28
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "DEEPSEEK_API_KEY", "\"\"")
     }
 
-    buildFeatures { compose = true }
-    buildTypes { debug { applicationIdSuffix = ".debug" } }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+    buildTypes {
+        debug { applicationIdSuffix = ".debug" }
+        release { buildConfigField("String", "DEEPSEEK_API_KEY", "\"$deepSeekBuildKey\"") }
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

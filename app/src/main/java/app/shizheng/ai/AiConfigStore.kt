@@ -16,7 +16,7 @@ class AiConfigStore(context: Context) {
     private val keyStore get() = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
 
     fun read(): AiConfig {
-        val encoded = preferences.getString("sealed", null) ?: return AiConfig()
+        val encoded = preferences.getString("sealed", null) ?: return AiConfig.builtInDefault()
         val bytes = Base64.decode(encoded, Base64.NO_WRAP)
         require(bytes.size > IV_SIZE)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
