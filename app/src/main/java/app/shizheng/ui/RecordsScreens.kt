@@ -21,6 +21,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -255,36 +256,39 @@ private fun FilterDialog(filter: RecordFilter, data: Snapshot, dismiss: () -> Un
     AlertDialog(
         onDismissRequest = dismiss, title = { Text("筛选记录") },
         text = {
-            Column(
-                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Help("同一组可勾选多项，匹配任一项即可。未勾选的组不限。")
-                if (years.isNotEmpty()) {
-                    Column {
-                        Heading("学年")
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            for ((termIds, name) in years) {
-                                val included = selected.termIds.containsAll(termIds)
-                                FilterChip(included, {
-                                    val terms = if (included) selected.termIds - termIds else selected.termIds + termIds
-                                    selected = selected.copy(termIds = terms)
-                                }, { Text("${name}学年") })
+            Column(Modifier.fillMaxWidth()) {
+                Column(
+                    Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(bottom = 6.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Help("同一组可勾选多项，匹配任一项即可。未勾选的组不限。")
+                    if (years.isNotEmpty()) {
+                        Column {
+                            Heading("学年")
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                for ((termIds, name) in years) {
+                                    val included = selected.termIds.containsAll(termIds)
+                                    RecordFilterChip("${name}学年", included) {
+                                        val terms = if (included) selected.termIds - termIds else selected.termIds + termIds
+                                        selected = selected.copy(termIds = terms)
+                                    }
+                                }
                             }
                         }
                     }
+                    FilterOptions("学期", selected.termIds,
+                        data.terms.map { it.id to it.name } + (RecordFilter.NO_TERM to "未归入学期")) {
+                        selected = selected.copy(termIds = it)
+                    }
+                    FilterOptions("类别", selected.categories, categoryOptions) { selected = selected.copy(categories = it) }
+                    FilterOptions("级别", selected.levels, Level.entries.map { it to it.label }) { selected = selected.copy(levels = it) }
+                    Choice("状态", selected.state.label, ArchiveState.entries.map { it to it.label }) { selected = selected.copy(state = it) }
                 }
-                FilterOptions("学期", selected.termIds,
-                    data.terms.map { it.id to it.name } + (RecordFilter.NO_TERM to "未归入学期")) {
-                    selected = selected.copy(termIds = it)
-                }
-                FilterOptions("类别", selected.categories, categoryOptions) { selected = selected.copy(categories = it) }
-                FilterOptions("级别", selected.levels, Level.entries.map { it to it.label }) { selected = selected.copy(levels = it) }
-                Choice("状态", selected.state.label, ArchiveState.entries.map { it to it.label }) { selected = selected.copy(state = it) }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             }
         },
         dismissButton = { TextButton({ apply(RecordFilter(query = filter.query)) }) { Text("清除筛选") } },
-        confirmButton = { TextButton({ apply(selected) }) { Text("应用筛选") } }
+        confirmButton = { PrimaryButton({ apply(selected) }) { Text("应用筛选") } }
     )
 }
 
@@ -296,10 +300,30 @@ private fun <T> FilterOptions(title: String, selected: Set<T>, options: List<Pai
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             for ((id, label) in options) {
                 val included = id in selected
-                FilterChip(included, { update(if (included) selected - id else selected + id) }, { Text(label) })
+                RecordFilterChip(label, included) { update(if (included) selected - id else selected + id) }
             }
         }
     }
+}
+
+@Composable
+private fun RecordFilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label) },
+        leadingIcon = {
+            Box(Modifier.size(FilterChipDefaults.IconSize), contentAlignment = Alignment.Center) {
+                if (selected) Icon(Icons.Default.Check, null)
+            }
+        },
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = scheme.primary,
+            selectedLabelColor = scheme.onPrimary,
+            selectedLeadingIconColor = scheme.onPrimary
+        )
+    )
 }
 
 @Composable

@@ -209,8 +209,11 @@ class RecordFlowTest {
             assertEquals(bounds[3].width, bounds[4].width, 1f)
             click("筛选")
             for (label in listOf("大一学年", "大二学年", "大二下", "竞赛", "志愿服务", "校级", "院级")) {
-                ui.onNodeWithText(label).performScrollTo().performClick()
+                val option = ui.onNodeWithText(label).performScrollTo().performClick()
+                if (label == "大二下") option.assertIsNotSelected() else option.assertIsSelected()
             }
+            ui.onNodeWithText("大一上").assertIsSelected()
+            ui.onNodeWithText("大一下").assertIsSelected()
             click("应用筛选")
             waitFor("3 条记录")
             assertEquals(drafts.take(3).map { it.id }.toSet(), state.filter.apply(state.data.value).map { it.id }.toSet())
