@@ -33,7 +33,6 @@ internal fun Mine(state: AppState, data: Snapshot) {
         }
         MenuItem("类别管理", "添加或删除记录类别", state::openCategories)
         MenuItem("备份与恢复", "保存或迁移记录和原始证明") { state.screen = Screen.BACKUP }
-        MenuItem("AI 记录", "用经历描述或照片填写新记录") { state.editRecord(from = Screen.MINE) }
         val ai = state.aiDestination(state.configuration).getOrNull()
         MenuItem("AI 设置", if (state.configuration.enabled && ai != null) "已启用 · ${ai.model}" else "开关、接口与模型") {
             state.openSettings(Screen.MINE)

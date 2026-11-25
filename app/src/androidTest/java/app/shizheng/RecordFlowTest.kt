@@ -65,7 +65,7 @@ class RecordFlowTest {
         }
     }
 
-    @Test fun storesUnprovenRecordThenFindsItAndUsesIndependentAiEntries() {
+    @Test fun storesUnprovenRecordAndKeepsAiEntryInNewRecord() {
         val config = AiConfigStore(app)
         val previous = config.read()
         config.write(AiConfig())
@@ -90,8 +90,7 @@ class RecordFlowTest {
             ui.onNode(hasSetTextAction()).performTextInput("没有匹配的关键字")
             waitFor("没有符合条件的记录")
             click("清空")
-            click("我的")
-            click("AI 记录")
+            clickDescription("新增记录")
             waitFor("AI 已关闭。")
             click("打开 AI 设置")
             waitFor("测试连接")
@@ -99,6 +98,8 @@ class RecordFlowTest {
             clickDescription("返回")
             waitFor("AI 已关闭。")
             clickDescription("返回")
+            click("我的")
+            ui.onNodeWithText("AI 记录").assertDoesNotExist()
             click("AI 设置")
             waitFor("测试连接")
             clickDescription("返回")

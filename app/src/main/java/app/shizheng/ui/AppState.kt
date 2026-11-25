@@ -131,12 +131,12 @@ internal class AppState @JvmOverloads constructor(
         screen = Screen.DETAIL
     }
 
-    fun editRecord(record: Record? = null, extras: Boolean = false, from: Screen = Screen.RECORDS) {
+    fun editRecord(record: Record? = null, extras: Boolean = false) {
         val initial = record?.let { RecordDraft.from(it, data.value.filesFor(it.id)) }
             ?: RecordDraft(termId = data.value.currentTermId)
         draft = initial
         original = initial
-        editorReturn = if (record == null) from else Screen.DETAIL
+        editorReturn = if (record == null) Screen.RECORDS else Screen.DETAIL
         screen = if (extras) Screen.EXTRAS else Screen.EDITOR
     }
 
