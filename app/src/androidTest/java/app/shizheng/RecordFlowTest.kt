@@ -3,6 +3,7 @@ package app.shizheng
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Color
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -141,6 +142,39 @@ class RecordFlowTest {
             assertEquals(listOf(drafts.last().id), state.data.value.records.map { it.id }.filter { id -> drafts.any { it.id == id } })
         } finally {
             val remaining = state.data.value.records.map { it.id }.filter { id -> drafts.any { it.id == id } }.toSet()
+            kotlinx.coroutines.runBlocking { state.repository.deleteRecords(remaining) }
+        }
+    }
+
+    @Test fun recordsScrollUnderFloatingNavigationAndKeepTheLastCardClear() {
+        val state = render()
+        val drafts = List(12) { index ->
+            RecordDraft(title = "浮层测试 ${index + 1}", category = Category.OTHER.name, start = "2026-11-${24 - index}")
+        }
+        try {
+            kotlinx.coroutines.runBlocking { drafts.forEach { state.repository.save(it) } }
+            ui.runOnIdle { state.changeFilter(RecordFilter(query = "浮层测试")) }
+            waitFor("12 条记录")
+            val list = ui.onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.ScrollToIndex))
+            val add = ui.onNodeWithContentDescription("新增记录")
+            val mine = ui.onNodeWithContentDescription("我的")
+            assertTrue(list.fetchSemanticsNode().boundsInRoot.bottom > add.fetchSemanticsNode().boundsInRoot.top)
+
+            list.performTouchInput { swipeUp(startY = height * 0.68f, endY = height * 0.24f) }
+            mine.assertDoesNotExist()
+            add.assertIsDisplayed()
+            list.performTouchInput { swipeDown(startY = height * 0.24f, endY = height * 0.68f) }
+            mine.assertIsDisplayed()
+
+            list.performScrollToIndex(drafts.size)
+            val lastCard = ui.onNodeWithText(drafts.last().title).fetchSemanticsNode().boundsInRoot
+            assertTrue(lastCard.bottom < add.fetchSemanticsNode().boundsInRoot.top)
+            clickDescription("我的")
+            ui.onNodeWithContentDescription("记录").assertIsDisplayed()
+            add.assertDoesNotExist()
+        } finally {
+            val ids = drafts.map { it.id }.toSet()
+            val remaining = state.data.value.records.map { it.id }.filter { it in ids }.toSet()
             kotlinx.coroutines.runBlocking { state.repository.deleteRecords(remaining) }
         }
     }

@@ -6,6 +6,11 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -23,8 +28,13 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -36,6 +46,7 @@ import app.shizheng.data.EvidenceKind
 import app.shizheng.data.Record
 import app.shizheng.data.Snapshot
 import java.time.LocalDate
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,6 +58,28 @@ internal fun ShizhengApp(state: AppState) {
     val selection = state.selectedRecordIds.takeIf { screen == Screen.RECORDS }
     val recordScroll = rememberLazyListState()
     val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    val floatingRecords = screen == Screen.RECORDS && selection == null && !keyboardVisible
+    var showRecordNavigation by remember(floatingRecords) { mutableStateOf(true) }
+    val scrollThreshold = with(LocalDensity.current) { 12.dp.toPx() }
+    val recordNavigationScroll = remember(floatingRecords, scrollThreshold) {
+        object : NestedScrollConnection {
+            private var travel = 0f
+
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (source != NestedScrollSource.UserInput || abs(available.y) <= abs(available.x)) return Offset.Zero
+                val reveal = available.y > 0f
+                if (reveal == showRecordNavigation) travel = 0f
+                else {
+                    travel += abs(available.y)
+                    if (travel >= scrollThreshold) {
+                        showRecordNavigation = reveal
+                        travel = 0f
+                    }
+                }
+                return Offset.Zero
+            }
+        }
+    }
     val results = if (screen == Screen.RECORDS) remember(data, state.filter) { state.filter.apply(data) } else emptyList()
     val visibleIds = remember(results) { results.mapTo(hashSetOf(), Record::id) }
     var deleteSelection by remember { mutableStateOf<Set<String>?>(null) }
@@ -173,18 +206,29 @@ internal fun ShizhengApp(state: AppState) {
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                     ) { Text("删除") }
                 }
-            } else if (atRoot && !keyboardVisible) RootNavigation(state)
+            } else if (atRoot && !keyboardVisible) RootNavigation(state, showCapsule = !floatingRecords || showRecordNavigation)
         },
         snackbarHost = { SnackbarHost(snackbar) }
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
+        // Keep the floating controls over the list. Their measured height is its scroll-end padding.
+        val direction = LocalLayoutDirection.current
+        val bodyPadding = if (floatingRecords) PaddingValues(
+            start = padding.calculateStartPadding(direction),
+            top = padding.calculateTopPadding(),
+            end = padding.calculateEndPadding(direction)
+        ) else padding
+        Box(Modifier.fillMaxSize().padding(bodyPadding).consumeWindowInsets(padding)) {
             if (!state.ready) {
                 if (state.failedToLoad && !state.busy) Page {
                     Help("无法读取本地记录。")
                     PrimaryButton(state::load) { Text("重试") }
                 }
             } else when (screen) {
-                Screen.RECORDS -> RecordList(state, data, results, recordScroll)
+                Screen.RECORDS -> RecordList(
+                    state, data, results, recordScroll,
+                    modifier = if (floatingRecords) Modifier.nestedScroll(recordNavigationScroll) else Modifier,
+                    bottomClearance = if (floatingRecords) padding.calculateBottomPadding() else 0.dp
+                )
                 Screen.MINE -> Mine(state, data)
                 Screen.DETAIL -> data.records.firstOrNull { it.id == state.recordId }?.let { RecordDetail(state, data, it) }
                 Screen.EDITOR, Screen.EXTRAS -> state.draft?.let {
@@ -232,7 +276,7 @@ internal fun ShizhengApp(state: AppState) {
 }
 
 @Composable
-private fun RootNavigation(state: AppState) {
+private fun RootNavigation(state: AppState, showCapsule: Boolean) {
     val onRecords = state.screen == Screen.RECORDS
     Column(
         Modifier.fillMaxWidth()
@@ -251,16 +295,26 @@ private fun RootNavigation(state: AppState) {
                 Icon(Icons.Default.Add, "新增记录", Modifier.size(30.dp))
             }
         }
-        Surface(
-            Modifier.widthIn(max = 336.dp).fillMaxWidth(0.78f),
-            shape = CircleShape, shadowElevation = 9.dp,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-        ) {
-            Row(Modifier.selectableGroup().heightIn(min = 60.dp)) {
-                NavItem("记录", Icons.AutoMirrored.Filled.List, onRecords, Modifier.weight(1f)) { state.screen = Screen.RECORDS }
-                NavItem("我的", if (onRecords) Icons.Outlined.Person else Icons.Default.Person, !onRecords, Modifier.weight(1f)) {
-                    state.screen = Screen.MINE
-                }
+        if (onRecords) AnimatedVisibility(
+            visible = showCapsule,
+            enter = fadeIn() + expandVertically(expandFrom = Alignment.Bottom, clip = false),
+            exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Bottom, clip = false)
+        ) { NavigationCapsule(state, onRecords) }
+        else NavigationCapsule(state, onRecords)
+    }
+}
+
+@Composable
+private fun NavigationCapsule(state: AppState, onRecords: Boolean) {
+    Surface(
+        Modifier.widthIn(max = 336.dp).fillMaxWidth(0.78f),
+        shape = CircleShape, shadowElevation = 9.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Row(Modifier.selectableGroup().heightIn(min = 60.dp)) {
+            NavItem("记录", Icons.AutoMirrored.Filled.List, onRecords, Modifier.weight(1f)) { state.screen = Screen.RECORDS }
+            NavItem("我的", if (onRecords) Icons.Outlined.Person else Icons.Default.Person, !onRecords, Modifier.weight(1f)) {
+                state.screen = Screen.MINE
             }
         }
     }

@@ -35,13 +35,17 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.shizheng.R
 import app.shizheng.data.*
 
 @Composable
-internal fun RecordList(state: AppState, data: Snapshot, results: List<Record>, scroll: LazyListState) {
+internal fun RecordList(
+    state: AppState, data: Snapshot, results: List<Record>, scroll: LazyListState,
+    modifier: Modifier, bottomClearance: Dp
+) {
     var showFilters by remember { mutableStateOf(false) }
     val filter = state.filter
     val selection = state.selectedRecordIds
@@ -50,10 +54,10 @@ internal fun RecordList(state: AppState, data: Snapshot, results: List<Record>, 
     }
 
     LazyColumn(
-        Modifier.fillMaxSize(),
+        modifier.fillMaxSize(),
         state = scroll,
         verticalArrangement = Arrangement.spacedBy(10.dp),
-        contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 12.dp)
+        contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 12.dp + bottomClearance)
     ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
