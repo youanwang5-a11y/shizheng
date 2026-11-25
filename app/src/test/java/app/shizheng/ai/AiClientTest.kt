@@ -76,9 +76,9 @@ class AiClientTest {
 
     @Test fun sendsImageAndMapsCustomCategoryAndVisibleFacts() = runBlocking {
         val category = RecordCategory(newId(), "项目展示")
-        server.enqueue(answer("""{"title":"光学展演","category":"项目展示","organization":"模拟学院","result":"一等奖","start":"2026-11-10","transcription":"光学展演\n模拟学院\n2026年11月10日"}"""))
+        server.enqueue(answer("""{"title":"orchid optics showcase","category":"项目展示","organization":"模拟学院","result":"一等奖","start":"2026-11-10","transcription":"Orchid Optics Showcase\n模拟学院\n2026年11月10日"}"""))
         val result = AiClient(transport).generate(settings, "", listOf(category), byteArrayOf(1, 2, 3))
-        assertEquals("光学展演", result.title)
+        assertEquals("Orchid Optics Showcase", result.title)
         assertEquals(category.id, result.category)
         assertEquals("模拟学院", result.organization)
         assertEquals("2026-11-10", result.start)
