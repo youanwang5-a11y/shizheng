@@ -3,9 +3,15 @@ package app.shizheng
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Color
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
@@ -180,7 +186,7 @@ class RecordFlowTest {
     }
 
     @Test fun combinesAcademicYearsTermsCategoriesAndLevelsBeforeSelectingAll() {
-        val state = render()
+        val state = render(width = 320.dp)
         val terms = state.data.value.terms.associateBy { it.name }
         val base = RecordDraft(category = Category.VOLUNTEER.name, level = Level.SCHOOL)
         val drafts = listOf(
@@ -193,6 +199,14 @@ class RecordFlowTest {
         try {
             kotlinx.coroutines.runBlocking { drafts.forEach { state.repository.save(it) } }
             ui.runOnIdle { state.changeFilter(RecordFilter(query = "组合候选")) }
+            waitFor("5 条记录")
+            val selectable = SemanticsMatcher.keyIsDefined(SemanticsProperties.Selected)
+            val archiveControls = listOf("全部", "待补证明", "已归档").map { ui.onNode(hasText(it) and selectable) }
+            val toolbar = archiveControls + listOf(ui.onNodeWithText("筛选"), ui.onNodeWithText("多选"))
+            val bounds = toolbar.map { it.assertIsDisplayed().fetchSemanticsNode().boundsInRoot }
+            assertTrue(bounds.all { it.center.y == bounds.first().center.y })
+            assertTrue(bounds.zipWithNext().all { (left, right) -> left.right <= right.left })
+            assertEquals(bounds[3].width, bounds[4].width, 1f)
             click("筛选")
             for (label in listOf("大一学年", "大二学年", "大二下", "竞赛", "志愿服务", "校级", "院级")) {
                 ui.onNodeWithText(label).performScrollTo().performClick()
@@ -374,10 +388,14 @@ class RecordFlowTest {
         }
     }
 
-    private fun render(client: AiClient = AiClient()): AppState {
+    private fun render(client: AiClient = AiClient(), width: Dp = Dp.Unspecified): AppState {
         lateinit var state: AppState
         ui.runOnUiThread { state = AppState(app, client) }
-        ui.setContent { ShizhengTheme { ShizhengApp(state) } }
+        ui.setContent {
+            ShizhengTheme {
+                Box(if (width == Dp.Unspecified) Modifier else Modifier.width(width)) { ShizhengApp(state) }
+            }
+        }
         ui.waitUntil(12_000) { state.ready && !state.busy }
         if (state.showWelcome) {
             click("暂不设置")

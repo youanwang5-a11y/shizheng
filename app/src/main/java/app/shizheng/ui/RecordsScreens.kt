@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
@@ -14,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
@@ -72,33 +74,19 @@ internal fun RecordList(
                         if (filter.query.isNotEmpty()) TextButton({ state.changeFilter(filter.copy(query = "")) }) { Text("清空") }
                     }
                 )
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                    itemVerticalAlignment = Alignment.CenterVertically
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                        for (status in ArchiveState.entries) {
-                            FilterChip(
-                                filter.state == status, { state.changeFilter(filter.copy(state = status)) }, { Text(status.label) },
-                                shape = MaterialTheme.shapes.extraLarge,
-                                colors = FilterChipDefaults.filterChipColors(
-                                    containerColor = MaterialTheme.colorScheme.surface,
-                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                                ),
-                                border = FilterChipDefaults.filterChipBorder(
-                                    selected = filter.state == status, enabled = true,
-                                    borderColor = MaterialTheme.colorScheme.outlineVariant
-                                )
-                            )
+                    for (status in ArchiveState.entries) {
+                        RecordToolbarControl(status.label, selected = filter.state == status) {
+                            state.changeFilter(filter.copy(state = status))
                         }
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                        ListAction("筛选", R.drawable.ic_filter) { showFilters = true }
-                        if (selection == null) ListAction("多选", R.drawable.ic_multiselect, results.isNotEmpty()) {
-                            state.startSelectingRecords()
-                        }
+                    RecordToolbarControl("筛选", icon = R.drawable.ic_filter) { showFilters = true }
+                    if (selection == null) RecordToolbarControl("多选", icon = R.drawable.ic_multiselect, enabled = results.isNotEmpty()) {
+                        state.startSelectingRecords()
                     }
                 }
                 val conditions = listOf(
@@ -199,16 +187,40 @@ internal fun RecordList(
 }
 
 @Composable
-private fun ListAction(label: String, icon: Int, enabled: Boolean = true, onClick: () -> Unit) {
-    OutlinedButton(
-        onClick, enabled = enabled, shape = MaterialTheme.shapes.small,
-        contentPadding = PaddingValues(horizontal = 7.dp),
-        colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+private fun RecordToolbarControl(
+    label: String, selected: Boolean? = null, icon: Int? = null, enabled: Boolean = true, onClick: () -> Unit
+) {
+    val scheme = MaterialTheme.colorScheme
+    val shape = if (selected == null) MaterialTheme.shapes.small else MaterialTheme.shapes.extraLarge
+    val action = if (selected == null) Modifier.clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+    else Modifier.selectable(selected, role = Role.Tab, onClick = onClick)
+    Box(
+        Modifier.heightIn(min = 48.dp).clip(shape).then(action),
+        contentAlignment = Alignment.Center
     ) {
-        Icon(painterResource(icon), null, Modifier.size(15.dp))
-        Spacer(Modifier.width(3.dp))
-        Text(label)
+        Surface(
+            shape = shape,
+            color = when (selected) {
+                true -> scheme.primary
+                false -> scheme.surface
+                null -> scheme.surfaceVariant
+            },
+            contentColor = when {
+                !enabled -> scheme.onSurface.copy(alpha = 0.38f)
+                selected == true -> scheme.onPrimary
+                else -> scheme.onSurfaceVariant
+            },
+            border = if (selected == true) null else BorderStroke(1.dp, scheme.outlineVariant)
+        ) {
+            Row(
+                Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 34.dp).padding(horizontal = 6.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (icon != null) Icon(painterResource(icon), null, Modifier.size(13.dp))
+                Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.sp, maxLines = 1)
+            }
+        }
     }
 }
 
