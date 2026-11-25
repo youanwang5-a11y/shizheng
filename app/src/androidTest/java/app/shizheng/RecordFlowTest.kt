@@ -166,9 +166,23 @@ class RecordFlowTest {
             val mine = ui.onNodeWithContentDescription("我的")
             assertTrue(list.fetchSemanticsNode().boundsInRoot.bottom > add.fetchSemanticsNode().boundsInRoot.top)
 
-            list.performTouchInput { swipeUp(startY = height * 0.68f, endY = height * 0.24f) }
-            mine.assertDoesNotExist()
-            add.assertIsDisplayed()
+            ui.mainClock.autoAdvance = false
+            try {
+                list.performTouchInput { swipeUp(startY = height * 0.68f, endY = height * 0.24f) }
+                val positions = List(55) {
+                    ui.mainClock.advanceTimeByFrame()
+                    add.fetchSemanticsNode().boundsInRoot.top
+                }
+                mine.assertDoesNotExist()
+                add.assertIsDisplayed()
+                val lastStep = positions.zipWithNext()
+                    .last { (before, after) -> before != after }
+                    .let { (before, after) -> kotlin.math.abs(after - before) }
+                val maximumStep = with(ui.density) { 4.dp.toPx() }
+                assertTrue("Add button moved $lastStep px on its final animation frame", lastStep < maximumStep)
+            } finally {
+                ui.mainClock.autoAdvance = true
+            }
             list.performTouchInput { swipeDown(startY = height * 0.24f, endY = height * 0.68f) }
             mine.assertIsDisplayed()
 

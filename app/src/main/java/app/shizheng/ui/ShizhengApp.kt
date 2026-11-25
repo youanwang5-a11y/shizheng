@@ -289,8 +289,7 @@ private fun RootNavigation(state: AppState, showCapsule: Boolean) {
         Modifier.fillMaxWidth()
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
             .padding(start = 20.dp, end = 20.dp, bottom = 10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(7.dp)
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         if (onRecords && state.ready) {
             FloatingActionButton(
@@ -310,11 +309,15 @@ private fun RootNavigation(state: AppState, showCapsule: Boolean) {
             val opacity by transition.animateFloat(label = "capsule opacity") { phase ->
                 if (phase == EnterExitState.Visible) 1f else 0f
             }
-            NavigationCapsule(state, onRecords, Modifier.graphicsLayer {
-                alpha = opacity
-                // Apply opacity without an offscreen buffer that clips the shadow to the layer bounds.
-                compositingStrategy = CompositingStrategy.ModulateAlpha
-            })
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                // Shrink the gap with the capsule so the add button has no last-frame offset.
+                Spacer(Modifier.height(7.dp))
+                NavigationCapsule(state, onRecords, Modifier.graphicsLayer {
+                    alpha = opacity
+                    // Apply opacity without an offscreen buffer that clips the shadow to the layer bounds.
+                    compositingStrategy = CompositingStrategy.ModulateAlpha
+                })
+            }
         }
         else NavigationCapsule(state, onRecords)
     }
