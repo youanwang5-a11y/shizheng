@@ -1,5 +1,19 @@
 # 拾证版本索引
 
+## v0.3.3 · 2026-11-25
+
+| 项目 | 值 |
+| --- | --- |
+| 构建提交 | `14801def2c869b1a68213f5bc4952dcf3e24a339`，已核对 APK 内嵌 Git 信息 |
+| Git 标签 | `v0.3.3`，包含交付文档 |
+| 私测 APK | `releases/v0.3.3/shizheng-0.3.3.apk` |
+| APK SHA-256 | `d4d75e4b2f3a62f91471e7a978f6d5fd4b04f6ab2f6fe34e8e15318626006399` |
+| 应用信息 | `app.shizheng`，版本 `0.3.3`（版本码 6），Android 9 及以上 |
+| 签名 | 沿用 0.3.2 分发签名，按下方「分发签名」恢复签名环境 |
+| 本地归档 | `releases/v0.3.3/shizheng-v0.3.3.bundle`、`SHA256SUMS.txt`、`verification/` |
+
+沿用 Room 2、完整备份格式 2 和 ZIP 记录导出格式。此包使用本机私测构建输入，归档留在本机。 [测试报告](TEST_REPORT.md)
+
 ## v0.3.2 · 2026-11-25
 
 | 项目 | 值 |
