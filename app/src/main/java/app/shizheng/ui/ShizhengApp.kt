@@ -143,7 +143,7 @@ internal fun ShizhengApp(state: AppState) {
                 },
                 actions = {
                     if (screen == Screen.RECORDS && state.ready && selection == null) {
-                        TextButton(state::startSelectingRecords, enabled = results.isNotEmpty()) { Text("多选") }
+                        TextButton({ state.startSelectingRecords() }, enabled = results.isNotEmpty()) { Text("多选") }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)

@@ -1,7 +1,7 @@
 package app.shizheng.ui
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -72,8 +72,15 @@ internal fun RecordList(state: AppState, data: Snapshot, results: List<Record>) 
         items(results, key = Record::id) { record ->
             val files = filesByRecord[record.id].orEmpty()
             val selected = selection?.contains(record.id) == true
-            val action = if (selection == null) Modifier.clickable { state.openRecord(record.id) }
-            else Modifier.toggleable(selected, role = Role.Checkbox, onValueChange = { state.toggleRecordSelection(record.id) })
+            val action = if (selection == null) {
+                Modifier.combinedClickable(
+                    onClick = { state.openRecord(record.id) },
+                    onLongClickLabel = "选择记录",
+                    onLongClick = { state.startSelectingRecords(record.id) }
+                )
+            } else {
+                Modifier.toggleable(selected, role = Role.Checkbox, onValueChange = { state.toggleRecordSelection(record.id) })
+            }
             Surface(
                 modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large,
                 color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,

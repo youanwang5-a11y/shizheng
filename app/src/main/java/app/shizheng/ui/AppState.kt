@@ -138,7 +138,9 @@ internal class AppState @JvmOverloads constructor(
         if (selectedRecordIds != null) selectedRecordIds = emptySet()
     }
 
-    fun startSelectingRecords() { selectedRecordIds = emptySet() }
+    fun startSelectingRecords(id: String? = null) {
+        selectedRecordIds = if (id == null) emptySet() else setOf(id)
+    }
 
     fun stopSelectingRecords() { selectedRecordIds = null }
 

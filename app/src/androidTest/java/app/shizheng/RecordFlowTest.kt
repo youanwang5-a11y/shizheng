@@ -102,6 +102,14 @@ class RecordFlowTest {
         try {
             kotlinx.coroutines.runBlocking { drafts.forEach { state.repository.save(it) } }
             ui.runOnIdle { state.changeFilter(RecordFilter(query = "批量验证")) }
+            click("批量验证甲")
+            waitFor("记录详情")
+            clickDescription("返回")
+            ui.onNodeWithText("批量验证甲").performTouchInput { longClick() }
+            waitFor("已选 1 条")
+            ui.onNodeWithText("批量验证甲").assertIsOn()
+            ui.onNodeWithText("批量验证乙").assertIsOff()
+            clickDescription("退出多选")
             click("多选")
             ui.onNodeWithText("导出").assertIsNotEnabled()
             click("批量验证甲")
